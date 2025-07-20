@@ -8,7 +8,6 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <body>
     <button id="helpBtn" title="Help">?</button>
     <div id="helpBox" class="hidden">
         <h3>Help Guide</h3>
@@ -16,15 +15,14 @@
             <li><strong>Reporting Period</strong>: Select the current reporting period in review.</li>
             <li><strong>Select one list at a time</strong>: Highly Recommended.</li>
             <li><strong>Current ART Line List</strong>: Required for processing DPT report.</li>
-            <li><strong>Previous ART Line List</strong>: Optional, help to track status change better (Restart).</li>
-            <li><strong>CASE MANAGER LINE LIST</strong>: Optional, (must contain UUID and CASE MANAGER Column).</li>
-            <li>Ensure all files are in .csv (recommended) .xlsx, or .xls format.</li>
+            <li><strong>Previous ART Line List</strong>: Optional, helps to track status change better (Restart).</li>
+            <li><strong>CASE MANAGER LINE LIST</strong>: Optional, must contain UUID and CASE MANAGER column.</li>
+            <li>Ensure all files are in .csv (recommended), .xlsx, or .xls format.</li>
             <li>Click "ART LINE LIST TO 2ND & 3RD 95 ANALYSIS" to generate report.</li>
-            <br>
-            
-        <p>For any issues, contact <a href="mailto:netocodes@gmail.com">netocodes@gmail.com </a>or call +2348134453841</p>
         </ul>
+        <p>For any issues, contact <a href="mailto:netocodes@gmail.com">netocodes@gmail.com</a> or call +2348134453841</p>
     </div>
+
     <div class="container">
         <h1>AHNI NMRS 2ND AND 3RD 95 ANALYZER</h1>
         <h2>Making data analysis easier and more accurate!</h2>
@@ -43,12 +41,12 @@
             </div>
 
             <div class="form-group">
-                <p>Previous ART Line List</p>
+                <p>Previous Week ART Line List</p>
                 <input type="file" id="fileInput2" name="file2" accept=".xlsx,.xls,.csv" />
             </div>
 
             <div class="form-group">
-                <p>ART Line list with uuid & CASE MANAGER Column</p>
+                <p>ART Line list with UUID & CASE MANAGER Column</p>
                 <input type="file" id="fileInput3" name="file3" accept=".xlsx,.xls,.csv" />
             </div>
         </div>
@@ -57,9 +55,12 @@
 
         <div class="button-group">
             <button id="fetchData">ART LINE LIST TO 3RD 95</button>
+            <button id="fetchData2nd">ART LINE LIST TO 2ND 95</button>
         </div>
 
-        <div id="loading" class="hidden">Fetching and Analyzing data, please wait...</div>
+        <div id="loading" class="hidden">
+            <div class="spinner"></div> Fetching and Analyzing data, please wait...
+        </div>
         <div id="message"></div>
 
         <a id="downloadLinkgray" class="hidden" href="#" target="_blank">Download File</a>
@@ -72,90 +73,72 @@
         const day = String(today.getDate()).padStart(2, '0');
         document.getElementById('endDate').value = `${year}-${month}-${day}`;
 
-        $(document).ready(function () {
-            $("#fetchData").click(function () {
-                const fileInput1 = $("#fileInput")[0];
-                const fileInput2 = $("#fileInput2")[0];
-                const fileInput3 = $("#fileInput3")[0];
-                const file1 = fileInput1.files[0];
-                const file2 = fileInput2.files[0];
-                const file3 = fileInput3.files[0];
-                const endDate = $("#endDate").val();
+        function uploadAndProcess(endpoint) {
+            const file1 = $("#fileInput")[0].files[0];
+            const file2 = $("#fileInput2")[0].files[0];
+            const file3 = $("#fileInput3")[0].files[0];
+            const endDate = $("#endDate").val();
+            const allowedExtensions = /\.(xlsx|xls|csv)$/i;
 
-                if (!file1) {
-                    $("#message").text("Please select Current ART Line List Excel file.").addClass("errmessage");
-                    return;
-                }
+            $("#message").removeClass("message errmessage").text("");
+            $("#downloadLinkgray").addClass("hidden");
 
-                const allowedExtensions = /(\.xlsx|\.xls|\.csv)$/i;
-                if (!allowedExtensions.exec(file1.name)) {
-                    $("#message").text("Current ART Line List must be an Excel file or csv (.xlsx, .xls or csv).").addClass("errmessage");
-                    return;
-                }
+            if (!file1) {
+                return showError("Please select Current ART Line List Excel file.");
+            }
+            if (!allowedExtensions.test(file1.name)) {
+                return showError("Current ART Line List must be an Excel file or CSV.");
+            }
+            if (file2 && !allowedExtensions.test(file2.name)) {
+                return showError("Previous ART Line List must be an Excel file or CSV.");
+            }
+            if (file3 && !allowedExtensions.test(file3.name)) {
+                return showError("Case Manager file must be an Excel file or CSV.");
+            }
 
-                if (file2 && !allowedExtensions.exec(file2.name)) {
-                    $("#message").text("Baseline ART Line List must be an Excel file or csv (.xlsx, .xls or csv).").addClass("errmessage");
-                    return;
-                }
+            const formData = new FormData();
+            formData.append("file1", file1);
+            if (file2) formData.append("file2", file2);
+            if (file3) formData.append("file3", file3);
+            formData.append("endDate", endDate);
 
-                if (file3 && !allowedExtensions.exec(file3.name)) {
-                    $("#message").text("Radet must be an Excel file or csv (.xlsx, .xls or csv).").addClass("errmessage");
-                    return;
-                }
+            $("#loading").removeClass("hidden");
 
-                const formData = new FormData();
-                formData.append("file1", file1);
-                if (file2) {
-                    formData.append("file2", file2); // Only append if it exists
-                }
-                if (file3) {
-                    formData.append("file3", file3); // Only append if it exists
-                }
-                formData.append("endDate", endDate);
-
-                $("#loading").removeClass("hidden");
-                $("#message").text("");
-                $("#uploadMessage").text("");
-
-                $.ajax({
-                    url: "/fetch",
-                    type: "POST",
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function (response) {
-                        $("#loading").addClass("hidden");
-                        $("#message").text(response.message).addClass("message");
-
-                        if (response.download_url) {
-                            $("#downloadLinkgray")
-                                .attr("href", response.download_url)
-                                .removeClass("hidden")
-                                .removeClass("downloadLinkgray")
-                                .addClass("downloadLink");
-                        }
-                    },
-                    /*error: function () {
-                        $("#loading").addClass("hidden");
-                        $("#message").text("Error fetching and processing data.").addClass("errmessage");
-                    }*/
-                    error: function (xhr) {
-                        $("#loading").addClass("hidden");
-                        let errMsg = "Error fetching and processing data.";
-
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            errMsg = xhr.responseJSON.message;
-                        }
-
-                        $("#message").text(errMsg).addClass("errmessage");
+            $.ajax({
+                url: endpoint,
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    $("#loading").addClass("hidden");
+                    $("#message").text(response.message).addClass("message");
+                    if (response.download_url) {
+                        $("#downloadLinkgray")
+                            .attr("href", response.download_url)
+                            .removeClass("hidden")
+                            .addClass("downloadLink");
                     }
-                });
+                },
+                error: function (xhr) {
+                    $("#loading").addClass("hidden");
+                    let errMsg = "Error fetching and processing data.";
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errMsg = xhr.responseJSON.message;
+                    }
+                    showError(errMsg);
+                }
             });
+        }
 
-        });
+        function showError(message) {
+            $("#message").text(message).addClass("errmessage");
+        }
 
-                $("#helpBtn").click(function () {
-            $("#helpBox").toggleClass("hidden");
+        $(document).ready(function () {
+            $("#fetchData").click(() => uploadAndProcess("/fetch"));
+            $("#fetchData2nd").click(() => uploadAndProcess("/fetch2nd95"));
+            $("#helpBtn").click(() => $("#helpBox").toggleClass("hidden"));
         });
     </script>
 </body>

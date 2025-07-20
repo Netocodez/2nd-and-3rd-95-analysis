@@ -128,8 +128,18 @@ button:hover {
 }
 
 #loading, .loading { color: var(--color-warn); }
-#message, .message { color: var(--color-success); }
-#errmessage, .errmessage { color: var(--color-error); }
+.message {
+    color: var(--color-success);
+}
+
+.errmessage {
+    color: var(--color-error);
+}
+
+#message.errmessage {
+    color: var(--color-error) !important;
+}
+
 
 /* Hidden Utility */
 .hidden {
@@ -269,4 +279,21 @@ input[type="month"] {
         font-size: 0.9rem;
         padding: 10px 14px;
     }
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #3498db;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
