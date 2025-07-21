@@ -1,9 +1,6 @@
-# app.py
 from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import os
-import logging
-import traceback
 from io import BytesIO
 from datetime import datetime
 from .emr_processor import process_Linelist, columns_to_select, columns_to_select2
@@ -50,28 +47,12 @@ def second95(df, endDate):
     #convert NextAppt to datetime
     df['NextAppt'] = pd.to_datetime(df['NextAppt'])
     
-    dfCurrentYearIIT = df[df['CurrentYearIIT'] == 'CurrentYearIIT'].reset_index()
-    dfCurrentYearIIT.insert(0, 'S/N', dfCurrentYearIIT.index + 1)
-    
-    dfpreviousyearIIT = df[df['previousyearIIT'] == 'previousyearIIT'].reset_index()
-    dfpreviousyearIIT.insert(0, 'S/N', dfpreviousyearIIT.index + 1)
-    
-    dfImminentIIT = df[df['ImminentIIT'] == 'ImminentIIT'].reset_index()
-    dfImminentIIT.insert(0, 'S/N', dfImminentIIT.index + 1)
-    
-    dfsevendaysIIT = df[df['sevendaysIIT'] == 'sevendaysIIT'].reset_index()
-    dfsevendaysIIT.insert(0, 'S/N', dfsevendaysIIT.index + 1)
-    
-    dfcurrentmonthexpected = df[df['currentmonthexpected'] == 'currentmonthexpected'].reset_index()
-    dfcurrentmonthexpected.insert(0, 'S/N', dfcurrentmonthexpected.index + 1)
-    
-    #Trime Line lists
-    dfCurrentYearIIT = dfCurrentYearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfpreviousyearIIT = dfpreviousyearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfImminentIIT = dfImminentIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfsevendaysIIT = dfsevendaysIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfcurrentmonthexpected = dfcurrentmonthexpected[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
+        
     df2nd95Summary = df
 
     df2nd95Summary['ActiveClients'] = df2nd95Summary['CurrentARTStatus'].apply(lambda x: 1 if x == "Active" else 0)
@@ -257,33 +238,12 @@ def second95CMG(df, endDate):
     df['ImminentIIT'] = df.apply(lambda row: 'ImminentIIT' if ((row['NextAppt'] <= today) & ((row['CurrentARTStatus'] == 'Active'))) else 'notImminentIIT', axis=1)
     df['sevendaysIIT'] = df.apply(lambda row: 'sevendaysIIT' if ((row['IITDate2'] <= sevenDaysIIT) & ((row['CurrentARTStatus'] == 'Active'))) else 'notsevenDaysIIT', axis=1)
     df['currentmonthexpected'] = df.apply(lambda row: 'currentmonthexpected' if ((row['NextApptMonthYear'] == currentmonthyear) & ((row['CurrentARTStatus'] == 'Active'))) else 'notcurrentmonthexpected', axis=1)
-    
-    dfCurrentYearIIT = df[df['CurrentYearIIT'] == 'CurrentYearIIT']
-    dfCurrentYearIIT = dfCurrentYearIIT.sort_values(by=['CaseManager'], ascending=True).reset_index()
-    dfCurrentYearIIT.insert(0, 'S/N', dfCurrentYearIIT.index + 1)
-    
-    dfpreviousyearIIT = df[df['previousyearIIT'] == 'previousyearIIT']
-    dfpreviousyearIIT = dfpreviousyearIIT.sort_values(by=['CaseManager'], ascending=True).reset_index()
-    dfpreviousyearIIT.insert(0, 'S/N', dfpreviousyearIIT.index + 1)
-    
-    dfImminentIIT = df[df['ImminentIIT'] == 'ImminentIIT']
-    dfImminentIIT = dfImminentIIT.sort_values(by=['CaseManager'], ascending=True).reset_index()
-    dfImminentIIT.insert(0, 'S/N', dfImminentIIT.index + 1)
-    
-    dfsevendaysIIT = df[df['sevendaysIIT'] == 'sevendaysIIT']
-    dfsevendaysIIT = dfsevendaysIIT.sort_values(by=['CaseManager'], ascending=True).reset_index()
-    dfsevendaysIIT.insert(0, 'S/N', dfsevendaysIIT.index + 1)
-    
-    dfcurrentmonthexpected = df[df['currentmonthexpected'] == 'currentmonthexpected']
-    dfcurrentmonthexpected = dfcurrentmonthexpected.sort_values(by=['CaseManager'], ascending=True).reset_index()
-    dfcurrentmonthexpected.insert(0, 'S/N', dfcurrentmonthexpected.index + 1)
-    
-    #Trime Line lists
-    dfCurrentYearIIT = dfCurrentYearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated","CaseManager"]]
-    dfpreviousyearIIT = dfpreviousyearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated","CaseManager"]]
-    dfImminentIIT = dfImminentIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated","CaseManager"]]
-    dfsevendaysIIT = dfsevendaysIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated","CaseManager"]]
-    dfcurrentmonthexpected = dfcurrentmonthexpected[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated","CaseManager"]]
+        
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by='CaseManager')
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
     
     df2nd95Summary = df
 
@@ -497,32 +457,13 @@ def Second95R(df, dfbaseline, endDate):
     df['weeklyexpectedrefilled'] = df.apply(lambda row: 'weeklyexpectedrefilled' if ((row['currentweekexpected'] == 'currentweekexpected') & ((row['Pharmacy_LastPickupdate2'] > row['BaselinePharmacy_LastPickupdate']) & (row['NextAppt'] > row['BaselineNextAppt']))) else 'notweeklyexpectedrefilled', axis=1)
     df['pendingweeklyrefill'] = df.apply(lambda row: 'pendingweeklyrefill' if ((row['BaselineNextAppt_week_year'] == currentWeekYear) & ((row['CurrentARTStatus'] == 'Active')) & ((row['BaselineCurrentARTStatus'] == 'Active')) & ((row['weeklyexpectedrefilled'] == 'notweeklyexpectedrefilled'))) else 'notpendingweeklyrefill', axis=1)
     #df.to_excel("refillrate.xlsx")
-    
-    dfCurrentYearIIT = df[df['CurrentYearIIT'] == 'CurrentYearIIT'].reset_index()
-    dfCurrentYearIIT.insert(0, 'S/N', dfCurrentYearIIT.index + 1)
-    
-    dfpreviousyearIIT = df[df['previousyearIIT'] == 'previousyearIIT'].reset_index()
-    dfpreviousyearIIT.insert(0, 'S/N', dfpreviousyearIIT.index + 1)
-    
-    dfImminentIIT = df[df['ImminentIIT'] == 'ImminentIIT'].reset_index()
-    dfImminentIIT.insert(0, 'S/N', dfImminentIIT.index + 1)
-    
-    dfsevendaysIIT = df[df['sevendaysIIT'] == 'sevendaysIIT'].reset_index()
-    dfsevendaysIIT.insert(0, 'S/N', dfsevendaysIIT.index + 1)
-    
-    dfcurrentmonthexpected = df[df['currentmonthexpected'] == 'currentmonthexpected'].reset_index()
-    dfcurrentmonthexpected.insert(0, 'S/N', dfcurrentmonthexpected.index + 1)
-    
-    dfpendingweeklyrefill = df[df['pendingweeklyrefill'] == 'pendingweeklyrefill'].reset_index()
-    dfpendingweeklyrefill.insert(0, 'S/N', dfpendingweeklyrefill.index + 1)
-    
-    #Trime Line lists
-    dfCurrentYearIIT = dfCurrentYearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfpreviousyearIIT = dfpreviousyearIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfImminentIIT = dfImminentIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfsevendaysIIT = dfsevendaysIIT[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfcurrentmonthexpected = dfcurrentmonthexpected[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
-    dfpendingweeklyrefill = dfpendingweeklyrefill[["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]]
+        
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
+    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select2)
     
     df2nd95Summary = df
 
@@ -786,8 +727,7 @@ def Second95RCMG(df, dfbaseline, endDate):
     dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select)
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select)
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select)
-    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select)
-            
+    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select) 
     
     df2nd95Summary = df
 
