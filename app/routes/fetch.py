@@ -5,7 +5,7 @@ import traceback
 from ..utils.file_loader import load_file, is_allowed_file, DATE_COLUMNS, NUMERIC_COLUMNS
 from ..utils.emr_processor import appendLamisData, ensureLGAState, emr_df
 from ..utils.third95 import third95, third95CMG
-from ..utils.second95 import second95, Second95R, Second95RCMG
+from ..utils.second95 import second95, Second95R, Second95RCMG, second95CMG
 
 import pandas as pd
 
@@ -123,7 +123,7 @@ def fetch_second95():
                 df['CaseManager'] = df['uuid'].map(df_cmg.set_index('uuid')['CASE MANAGER']).fillna('Unassigned')
             else:
                 return jsonify({"message": "File3 must contain 'uuid' and 'CASE MANAGER' columns"}), 400
-            output_filename = third95CMG(df, end_date)
+            output_filename = second95CMG(df, end_date)
             
         # === CASE 4: file1 + file2 + file3 ===
         elif file2 and is_allowed_file(file2.filename) and file3 and is_allowed_file(file3.filename):
