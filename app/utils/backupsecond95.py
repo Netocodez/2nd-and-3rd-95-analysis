@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2
 
 
 def second95(df, endDate):
@@ -94,16 +94,108 @@ def second95(df, endDate):
     }
 
     # Write each dataframe to a different sheet
-    filename = export_to_excel_with_formatting(
-        dataframes,
-        formatted_period,
-        summaryName="2ND 95 SUMMARY",
-        division_columns=None,
-        color_column=["%Weekly Refill Rate"],
-        column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1 #merge first three columns for the summary total row
-    )
-    return filename
+    for sheet_name, dataframe in dataframes.items():
+        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+        
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+        
+        # Add a header format.
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+            }
+        )
+        
+        # Write the column headers with the defined format.
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+        # Add percentage format to a specific column in "2ND 95 SUMMARY" (e.g., column B which is index 1)
+        if sheet_name == "2ND 95 SUMMARY":
+            # Add title to the worksheet
+            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'2ND 95 SUMMARY AS AT {formatted_period}', title_format)
+            
+            # Write the dataframe to the sheet, starting from row 2 to leave space for the title and headers
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 1
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(1, col_num, value, header_format)
+            
+            # Add percentage format to column B
+            percentage_format = workbook.add_format({'num_format': '0.00%'})
+            worksheet.set_column('B:B', None, percentage_format)
+            
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.hide_gridlines(2)
+            
+            column_ranges = {
+                'A:A': 20,  # Example width for columns A to A
+                'B:B': 35,  # Example width for columns B to B
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            # Add total row
+            header_format.set_align('center')
+            total_row = len(dataframe) + 2
+            worksheet.merge_range(total_row, 0, total_row, 1, 'Total', header_format)
+            for col_num in range(1, len(dataframe.columns)):
+                col_letter = chr(65 + col_num)  # Convert column number to letter
+                worksheet.write_formula(total_row, col_num, f'SUM({col_letter}2:{col_letter}{total_row})', header_format)
+        
+        else:
+            # Write the dataframe to the sheet, starting from row 1
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 0
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+        
+        # Add row band format to specific sheets
+        if sheet_name in ["CURRENT FY IIT", "PREVIOUS FY IIT", "IMMINENT IIT", "NEXT 7 DAYS IIT", "EXPECTED THIS MONTH"]:
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            
+            # Specify column widths for a range of columns
+            column_ranges = {
+                'O:AF': 10,  # Example width for columns O to AF
+                'J:M': 12,  # Example width for columns J to M
+                'N:N': 40,  # Example width for column N
+                'E:F': 15,  # Example width for columns E to F
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            worksheet.set_column('G:G', None, None, {'hidden': True})
+        
+    writer.close()
+    output.seek(0)
+
+    # Resolve absolute path to outputs folder
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"2nd_95_ANALYSIS_{timestamp}.xlsx"
+    output_path = os.path.abspath(os.path.join(output_dir, filename))
+
+    # Save Excel file
+    with open(output_path, "wb") as f:
+        f.write(output.getbuffer())
+
+    return filename  # just filename, not full path
 
 
 def second95CMG(df, endDate):
@@ -178,6 +270,11 @@ def second95CMG(df, endDate):
     #format and export
     formatted_period = endDate.strftime("%d-%m-%Y")
 
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    workbook = writer.book
+
     # List of dataframes and their corresponding sheet names
     dataframes = {
         "CURRENT FY IIT": dfCurrentYearIIT,
@@ -190,16 +287,110 @@ def second95CMG(df, endDate):
     }
 
     # Write each dataframe to a different sheet
-    filename = export_to_excel_with_formatting(
-        dataframes,
-        formatted_period,
-        summaryName="2ND 95 SUMMARY",
-        division_columns=None,
-        color_column=["%Weekly Refill Rate"],
-        column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2 #merge first three columns for the summary total row
-    )
-    return filename
+    for sheet_name, dataframe in dataframes.items():
+        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+        
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+        
+        # Add a header format.
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+            }
+        )
+        
+        # Write the column headers with the defined format.
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+        # Add percentage format to a specific column in "2ND 95 SUMMARY" (e.g., column B which is index 1)
+        if sheet_name == "2ND 95 SUMMARY":
+            # Add title to the worksheet
+            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'2ND 95 SUMMARY AS AT {formatted_period}', title_format)
+            
+            # Write the dataframe to the sheet, starting from row 2 to leave space for the title and headers
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 1
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(1, col_num, value, header_format)
+            
+            # Add percentage format to column B
+            percentage_format = workbook.add_format({'num_format': '0.00%'})
+            worksheet.set_column('B:B', None, percentage_format)
+            
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.hide_gridlines(2)
+            
+            column_ranges = {
+                'A:A': 20,  # Example width for columns A to A
+                'B:B': 35,  # Example width for columns B to B
+                'C:C': 25,  # Example width for columns C to C
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            # Add total row
+            header_format.set_align('center')
+            total_row = len(dataframe) + 2
+            worksheet.merge_range(total_row, 0, total_row, 2, 'Total', header_format)
+            for col_num in range(1, len(dataframe.columns)):
+                col_letter = chr(65 + col_num)  # Convert column number to letter
+                worksheet.write_formula(total_row, col_num, f'SUM({col_letter}2:{col_letter}{total_row})', header_format)
+        
+        else:
+            # Write the dataframe to the sheet, starting from row 1
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 0
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+        
+        # Add row band format to specific sheets
+        if sheet_name in ["CURRENT FY IIT", "PREVIOUS FY IIT", "IMMINENT IIT", "NEXT 7 DAYS IIT", "EXPECTED THIS MONTH"]:
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            
+            # Specify column widths for a range of columns
+            column_ranges = {
+                'O:AF': 10,  # Example width for columns O to AF
+                'J:M': 12,  # Example width for columns J to M
+                'N:N': 40,  # Example width for column N
+                'E:F': 15,  # Example width for columns E to F
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            worksheet.set_column('G:G', None, None, {'hidden': True})
+
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.close()
+    output.seek(0)
+
+    # Resolve absolute path to outputs folder
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"2nd_95_ANALYSIS_{timestamp}.xlsx"
+    output_path = os.path.abspath(os.path.join(output_dir, filename))
+
+    # Save Excel file
+    with open(output_path, "wb") as f:
+        f.write(output.getbuffer())
+
+    return filename  # just filename, not full path
 
 
 def Second95R(df, dfbaseline, endDate): 
@@ -325,16 +516,127 @@ def Second95R(df, dfbaseline, endDate):
     }
 
     # Write each dataframe to a different sheet
-    filename = export_to_excel_with_formatting(
-        dataframes,
-        formatted_period,
-        summaryName="2ND 95 SUMMARY",
-        division_columns={"G": ("F", "E")},
-        color_column=["%Weekly Refill Rate"],
-        column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1 #merge first three columns for the summary total row
-    )
-    return filename  
+    for sheet_name, dataframe in dataframes.items():
+        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+        
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+        
+        # Add a header format.
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+            }
+        )
+        
+        # Write the column headers with the defined format.
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+        # Add percentage format to columns
+        percentage_format2 = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+                'num_format': '0.00%',
+            }
+        )
+        percentage_format = workbook.add_format({'num_format': '0.00%'})
+            
+        # Add percentage format to a specific column in "2ND 95 SUMMARY" (e.g., column B which is index 1)
+        if sheet_name == "2ND 95 SUMMARY":
+            # Add title to the worksheet
+            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'2ND 95 SUMMARY AS AT {formatted_period}', title_format)
+            
+            # Write the dataframe to the sheet, starting from row 2 to leave space for the title and headers
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 1
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(1, col_num, value, header_format)
+            
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.hide_gridlines(2)
+            
+            column_ranges = {
+                'A:A': 20,  # Example width for columns A to A
+                'B:B': 35,  # Example width for columns B to B
+                #'C:C': 25,  # Example width for columns C to C
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+                
+            worksheet.set_column('G:G', None, percentage_format) #add percentage to column G
+            
+            # Add total row
+            header_format.set_align('center')
+            total_row = len(dataframe) + 2
+            worksheet.merge_range(total_row, 0, total_row, 1, 'Total', header_format)
+            for col_num in range(1, len(dataframe.columns)):
+                col_letter = chr(65 + col_num)  # Convert column number to letter
+                #worksheet.write_formula(total_row, col_num, f'SUM({col_letter}2:{col_letter}{total_row})', header_format)
+                if col_letter == 'G':  # Column G to be calculated as E / C
+                    worksheet.write_formula(total_row, col_num, f'SUM(F3:F{total_row}) / SUM(E3:E{total_row})', percentage_format2)
+                #elif col_letter == 'I':  # Column I to be calculated as H / C
+                    #worksheet.write_formula(total_row, col_num, f'SUM(H3:H{total_row}) / SUM(C3:C{total_row})', percentage_format2)
+                else:
+                    worksheet.write_formula(total_row, col_num, f'SUM({col_letter}3:{col_letter}{total_row})', header_format)
+                        
+        else:
+            # Write the dataframe to the sheet, starting from row 1
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 0
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+        
+        # Add row band format to specific sheets
+        if sheet_name in ["CURRENT FY IIT", "PREVIOUS FY IIT", "IMMINENT IIT", "NEXT 7 DAYS IIT", "EXPECTED THIS MONTH", "EXPECTED THIS WEEK"]:
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            
+            # Specify column widths for a range of columns
+            column_ranges = {
+                'O:AF': 10,  # Example width for columns O to AF
+                'J:M': 12,  # Example width for columns J to M
+                'N:N': 40,  # Example width for column N
+                'E:F': 15,  # Example width for columns E to F
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            worksheet.set_column('G:G', None, None, {'hidden': True})
+
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.close()
+    output.seek(0)
+
+    # Resolve absolute path to outputs folder
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"2nd_95_ANALYSIS_{timestamp}.xlsx"
+    output_path = os.path.abspath(os.path.join(output_dir, filename))
+
+    # Save Excel file
+    with open(output_path, "wb") as f:
+        f.write(output.getbuffer())
+
+    return filename  # just filename, not full path    
 
 def Second95RCMG(df, dfbaseline, endDate): 
     
@@ -460,6 +762,11 @@ def Second95RCMG(df, dfbaseline, endDate):
     #format and export
     formatted_period = endDate.strftime("%d-%m-%Y")
 
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    workbook = writer.book
+
     # List of dataframes and their corresponding sheet names
     dataframes = {
         "CURRENT FY IIT": dfCurrentYearIIT,
@@ -473,14 +780,143 @@ def Second95RCMG(df, dfbaseline, endDate):
     }
 
     # Write each dataframe to a different sheet
-    filename = export_to_excel_with_formatting(
-        dataframes,
-        formatted_period,
-        summaryName="2ND 95 SUMMARY",
-        division_columns={"H": ("G", "F")},
-        color_column=["%Weekly Refill Rate"],
-        column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2 #merge first three columns for the summary total row
-    )
-    return filename
+    for sheet_name, dataframe in dataframes.items():
+        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+        
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+        
+        # Add a header format.
+        header_format = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+            }
+        )
+        
+        # Write the column headers with the defined format.
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+        # Add percentage format to columns
+        percentage_format2 = workbook.add_format(
+            {
+                "bold": True,
+                "text_wrap": True,
+                "valign": "bottom",
+                "fg_color": "#D7E4BC",
+                "border": 1,
+                'num_format': '0.00%',
+            }
+        )
+        percentage_format = workbook.add_format({'num_format': '0.00%'})
+            
+        # Add percentage format to a specific column in "2ND 95 SUMMARY" (e.g., column B which is index 1)
+        if sheet_name == "2ND 95 SUMMARY":
+            # Add title to the worksheet
+            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'2ND 95 SUMMARY AS AT {formatted_period}', title_format)
+            
+            # Write the dataframe to the sheet, starting from row 2 to leave space for the title and headers
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 1
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(1, col_num, value, header_format)
+            
+            colorscales = ['%Weekly Refill Rate']
+            for col_name in colorscales:
+                if col_name in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col_name]):
+                    col_index = dataframe.columns.get_loc(col_name)
+            
+                    start_row = 2  # Excel rows are 1-indexed; row 1 is header
+                    end_row = len(dataframe) + 1
+            
+                    # Apply 3-color scale conditional formatting
+                    worksheet.conditional_format(
+                        start_row, col_index, end_row, col_index,
+                        {
+                            'type': '3_color_scale',
+                            'min_color': '#F8696B',
+                            'mid_color': '#FFEB84',
+                            'max_color': '#63BE7B',
+                        }
+                    )
+            
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.hide_gridlines(2)
+            
+            column_ranges = {
+                'A:A': 20,  # Example width for columns A to A
+                'B:B': 35,  # Example width for columns B to B
+                'C:C': 35,  # Example width for columns B to B
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+                
+            worksheet.set_column('H:H', None, percentage_format) #add percentage to column G
+            
+            # Add total row
+            header_format.set_align('center')
+            total_row = len(dataframe) + 2
+            worksheet.merge_range(total_row, 0, total_row, 1, 'Total', header_format)
+            for col_num in range(1, len(dataframe.columns)):
+                col_letter = chr(65 + col_num)  # Convert column number to letter
+                #worksheet.write_formula(total_row, col_num, f'SUM({col_letter}2:{col_letter}{total_row})', header_format)
+                if col_letter == 'H':  # Column G to be calculated as E / C
+                    worksheet.write_formula(total_row, col_num, f'SUM(G3:G{total_row}) / SUM(F3:F{total_row})', percentage_format2)
+                #elif col_letter == 'I':  # Column I to be calculated as H / C
+                    #worksheet.write_formula(total_row, col_num, f'SUM(H3:H{total_row}) / SUM(C3:C{total_row})', percentage_format2)
+                else:
+                    worksheet.write_formula(total_row, col_num, f'SUM({col_letter}3:{col_letter}{total_row})', header_format)
+                        
+        else:
+            # Write the dataframe to the sheet, starting from row 1
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+            
+            # Write the column headers with the defined format, starting from row 0
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(0, col_num, value, header_format)
+        
+        # Add row band format to specific sheets
+        if sheet_name in ["CURRENT FY IIT", "PREVIOUS FY IIT", "IMMINENT IIT", "NEXT 7 DAYS IIT", "EXPECTED THIS MONTH", "EXPECTED THIS WEEK"]:
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1, 
+                                        {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            
+            # Specify column widths for a range of columns
+            column_ranges = {
+                'O:AF': 10,  # Example width for columns O to AF
+                'J:M': 12,  # Example width for columns J to M
+                'N:N': 40,  # Example width for column N
+                'E:F': 15,  # Example width for columns E to F
+                # Add more column ranges and their widths as needed
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+            
+            worksheet.set_column('G:G', None, None, {'hidden': True})
 
+    # Close the Pandas Excel writer and output the Excel file.
+    writer.close()
+    output.seek(0)
+
+    # Resolve absolute path to outputs folder
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"2nd_95_ANALYSIS_{timestamp}.xlsx"
+    output_path = os.path.abspath(os.path.join(output_dir, filename))
+
+    # Save Excel file
+    with open(output_path, "wb") as f:
+        f.write(output.getbuffer())
+
+    return filename  # just filename, not full path

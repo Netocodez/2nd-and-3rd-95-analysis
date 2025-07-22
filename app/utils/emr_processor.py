@@ -1,4 +1,7 @@
 import pandas as pd
+import os
+from io import BytesIO
+from datetime import datetime
 
 emr_df = pd.read_csv("LAMISNMRS.csv", encoding='utf-8')
 
@@ -136,3 +139,145 @@ def ensureLGAState(df, emr_df):
     df.drop(['Name on NMRS', 'LGA_emr', 'STATE', 'Name on Lamis'], axis=1, inplace=True)
     
     return df
+
+def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY", division_columns=None, color_column="%Weekly Refill Rate", column_widths=None, mergeNum=2):
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine="xlsxwriter")
+    
+    # Strip time from datetime columns to ensure clean yyyy-mm-dd export
+    for df_name, df_data in dataframes.items():
+        for col in df_data.columns:
+            if pd.api.types.is_datetime64_any_dtype(df_data[col]):
+                df_data[col] = df_data[col].dt.date
+
+    for sheet_name, dataframe in dataframes.items():
+        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
+
+        # Header format
+        header_format = workbook.add_format({
+            "bold": True,
+            "text_wrap": True,
+            "valign": "bottom",
+            "fg_color": "#D7E4BC",
+            "border": 1,
+        })
+
+        # Percentage formats
+        percentage_format = workbook.add_format({'num_format': '0.00%'})
+        percentage_format_bold = workbook.add_format({
+            "bold": True,
+            "text_wrap": True,
+            "valign": "bottom",
+            "fg_color": "#D7E4BC",
+            "border": 1,
+            'num_format': '0.00%',
+        })
+
+        # Write column headers
+        for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+
+        if sheet_name == summaryName:
+            # Title
+            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'{summaryName} AS AT {formatted_period}', title_format)
+
+            # Rewrite headers and data starting from row 2
+            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            for col_num, value in enumerate(dataframe.columns.values):
+                worksheet.write(1, col_num, value, header_format)
+
+            # Apply color scale to multiple columns if specified
+            if isinstance(color_column, (list, tuple)):
+                color_columns = color_column
+            else:
+                color_columns = [color_column]
+
+            for col in color_columns:
+                if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+                    col_index = dataframe.columns.get_loc(col)
+                    worksheet.conditional_format(
+                        2, col_index, len(dataframe) + 1, col_index,
+                        {
+                            'type': '3_color_scale',
+                            'min_color': '#F8696B',
+                            'mid_color': '#FFEB84',
+                            'max_color': '#63BE7B',
+                        }
+                    )
+
+            # Row banding
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1,
+                                         {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.hide_gridlines(2)
+
+            # Set column widths
+            if column_widths:
+                for col_range, width in column_widths.items():
+                    worksheet.set_column(col_range, width)
+            
+            if division_columns is None:
+                division_columns = {}  # fallback to empty dict
+            
+            if division_columns:
+                for target_col in division_columns.keys():
+                    worksheet.set_column(f"{target_col}:{target_col}", None, percentage_format)
+
+            # Total row with formulas
+            header_format.set_align('center')
+            total_row = len(dataframe) + 2
+            worksheet.merge_range(total_row, 0, total_row, mergeNum, 'Total', header_format)
+            for col_num in range(1, len(dataframe.columns)):
+                col_letter = chr(65 + col_num)
+
+                if col_letter in division_columns:
+                    numerator_col, denominator_col = division_columns[col_letter]
+                    worksheet.write_formula(
+                        total_row,
+                        col_num,
+                        f"SUM({numerator_col}3:{numerator_col}{total_row}) / SUM({denominator_col}3:{denominator_col}{total_row})",
+                        percentage_format_bold
+                    )
+                else:
+                    worksheet.write_formula(
+                        total_row,
+                        col_num,
+                        f"SUM({col_letter}3:{col_letter}{total_row})",
+                        header_format
+                    )
+
+        elif sheet_name != summaryName:
+            # Row banding
+            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1,
+                                         {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+
+            # Set column widths
+            column_ranges = {
+                'O:AF': 10, 'J:M': 12, 'N:N': 40, 'E:F': 15
+            }
+            for col_range, width in column_ranges.items():
+                worksheet.set_column(col_range, width)
+
+            worksheet.set_column('G:G', None, None, {'hidden': True})
+
+    # Save the workbook
+    writer.close()
+    output.seek(0)
+    
+    # Resolve absolute path to outputs folder
+    output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{summaryName}_{timestamp}.xlsx"
+    output_path = os.path.join(output_dir, filename)
+
+    with open(output_path, "wb") as f:
+        f.write(output.getbuffer())
+
+    return filename
