@@ -4,49 +4,20 @@ import os
 from io import BytesIO
 from datetime import datetime
 from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting
-
+from .utils_2nd95 import (
+    compute_appointment_and_iit_dates,
+    classify_iit_Appt_status,
+    integrate_baseline_data
+)
 
 def second95(df, endDate):
     
     endDate = pd.to_datetime(endDate)
     
-    # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
-
-    #Fill zero if the column contains number greater than 180
-    df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)
-
-    # Calculate the 'NextAppt' column by adding the 'DaysOfARVRefill2' to 'Pharmacy_LastPickupdate2'
-    df['NextAppt'] = df['Pharmacy_LastPickupdate2'] + pd.to_timedelta(df['DaysOfARVRefill2'], unit='D') 
-    df['IITDate2'] = (df['NextAppt'] + pd.Timedelta(days=29)).fillna('1900')
+    df = compute_appointment_and_iit_dates(df)
+    df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     
-    df.insert(0, 'S/N.', df.index + 1)
-    
-    today = pd.Timestamp(endDate)
-    currentyear = today.year
-    previousyear = today.year-1
-    currentmonthyear = str(today.month) + '_' + str(today.year)
-    print(currentmonthyear)
-    sevenDaysIIT = today + pd.Timedelta(days=7)
-
-    print(currentyear)
-    print(previousyear)
-    
-    #2nd 95 columns integration
-    df['IITDate2'] = pd.to_datetime(df['IITDate2'])
-    df['IITYear'] = df['IITDate2'].dt.year
-    df['NextApptMonthYear'] = df['NextAppt'].fillna('1900').dt.month.astype(int).astype(str) + '_' + df['NextAppt'].fillna('1900').dt.year.astype(int).astype(str)
-    print(df['NextApptMonthYear'])
-    print(df['IITYear'])
-    df['CurrentYearIIT'] = df.apply(lambda row: 'CurrentYearIIT' if ((row['IITYear'] == currentyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notCurrentYearIIT', axis=1)
-    df['previousyearIIT'] = df.apply(lambda row: 'previousyearIIT' if ((row['IITYear'] == previousyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notpreviousyearIIT', axis=1) 
-    df['ImminentIIT'] = df.apply(lambda row: 'ImminentIIT' if ((row['NextAppt'] <= today) & ((row['CurrentARTStatus'] == 'Active'))) else 'notImminentIIT', axis=1)
-    df['sevendaysIIT'] = df.apply(lambda row: 'sevendaysIIT' if ((row['IITDate2'] <= sevenDaysIIT) & ((row['CurrentARTStatus'] == 'Active'))) else 'notsevenDaysIIT', axis=1)
-    df['currentmonthexpected'] = df.apply(lambda row: 'currentmonthexpected' if ((row['NextApptMonthYear'] == currentmonthyear) & ((row['CurrentARTStatus'] == 'Active'))) else 'notcurrentmonthexpected', axis=1)
-    
-    #convert NextAppt to datetime
-    df['NextAppt'] = pd.to_datetime(df['NextAppt'])
-    
+    #Generate line lists
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
     dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
@@ -77,10 +48,6 @@ def second95(df, endDate):
     
     #format and export
     formatted_period = endDate.strftime("%d-%m-%Y")
-
-    output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
-    workbook = writer.book
 
     # List of dataframes and their corresponding sheet names
     dataframes = {
@@ -113,39 +80,8 @@ def second95CMG(df, endDate):
     #add case managers and next appt to the dataframe
     df['CaseManager'] = df['CaseManager'].fillna('UNASSIGNED')
         
-    # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
-
-    #Fill zero if the column contains number greater than 180
-    df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)
-
-    # Calculate the 'NextAppt' column by adding the 'DaysOfARVRefill2' to 'Pharmacy_LastPickupdate2'
-    df['NextAppt'] = df['Pharmacy_LastPickupdate2'] + pd.to_timedelta(df['DaysOfARVRefill2'], unit='D') 
-    df['IITDate2'] = (df['NextAppt'] + pd.Timedelta(days=29)).fillna('1900')
-
-    df.insert(0, 'S/N.', df.index + 1)
-    
-    today = pd.Timestamp(endDate)
-    currentyear = today.year
-    previousyear = today.year-1
-    currentmonthyear = str(today.month) + '_' + str(today.year)
-    print(currentmonthyear)
-    sevenDaysIIT = today + pd.Timedelta(days=7)
-
-    print(currentyear)
-    print(previousyear)
-    
-    #2nd 95 columns integration
-    df['IITDate2'] = pd.to_datetime(df['IITDate2'])
-    df['IITYear'] = df['IITDate2'].dt.year
-    df['NextApptMonthYear'] = df['NextAppt'].fillna('1900').dt.month.astype(int).astype(str) + '_' + df['NextAppt'].fillna('1900').dt.year.astype(int).astype(str)
-    print(df['NextApptMonthYear'])
-    print(df['IITYear'])
-    df['CurrentYearIIT'] = df.apply(lambda row: 'CurrentYearIIT' if ((row['IITYear'] == currentyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notCurrentYearIIT', axis=1)
-    df['previousyearIIT'] = df.apply(lambda row: 'previousyearIIT' if ((row['IITYear'] == previousyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notpreviousyearIIT', axis=1) 
-    df['ImminentIIT'] = df.apply(lambda row: 'ImminentIIT' if ((row['NextAppt'] <= today) & ((row['CurrentARTStatus'] == 'Active'))) else 'notImminentIIT', axis=1)
-    df['sevendaysIIT'] = df.apply(lambda row: 'sevendaysIIT' if ((row['IITDate2'] <= sevenDaysIIT) & ((row['CurrentARTStatus'] == 'Active'))) else 'notsevenDaysIIT', axis=1)
-    df['currentmonthexpected'] = df.apply(lambda row: 'currentmonthexpected' if ((row['NextApptMonthYear'] == currentmonthyear) & ((row['CurrentARTStatus'] == 'Active'))) else 'notcurrentmonthexpected', axis=1)
+    df = compute_appointment_and_iit_dates(df)
+    df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
@@ -205,67 +141,10 @@ def second95CMG(df, endDate):
 def Second95R(df, dfbaseline, endDate): 
     
     endDate = pd.to_datetime(endDate)
-
-    #declaver variables for analysis
-    today = pd.Timestamp(endDate)
-    currentyear = today.year
-    previousyear = today.year-1
-    currentmonthyear = str(today.month) + '_' + str(today.year)
-    sevenDaysIIT = today + pd.Timedelta(days=7)
-    currentWeekYear = f"{today.isocalendar().week}_{today.year}"
-    print(currentWeekYear)
     
-    #Bring in Values from baseline ART line list
-    df['BaselineCurrentARTStatus']=df['uuid'].map(dfbaseline.set_index('uuid')['CurrentARTStatus'])
-    df['BaselinePharmacy_LastPickupdate']=df['uuid'].map(dfbaseline.set_index('uuid')['Pharmacy_LastPickupdate'])
-    df['BaselineDaysOfARVRefill']=df['uuid'].map(dfbaseline.set_index('uuid')['DaysOfARVRefill'])
-    
-    #Calculate Next Appointment for Added baseline columns
-    df['BaselinePharmacy_LastPickupdate'] = pd.to_datetime(df['BaselinePharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
-    df['BaselineDaysOfARVRefill'] = pd.to_numeric(df['BaselineDaysOfARVRefill']).apply(lambda x: 0 if x > 180 else x)
-    df['BaselineNextAppt'] = pd.to_datetime(df['BaselinePharmacy_LastPickupdate'], errors='coerce', dayfirst=True) + pd.to_timedelta(df['BaselineDaysOfARVRefill'], unit='D') 
-    
-    #Create week year columns for baseline last pickup date and baseline next appointment
-    df['BaselinePharmacy_LastPickupdate_week_year'] = df['BaselinePharmacy_LastPickupdate'].dt.isocalendar().week.astype(str) + '_' + df['BaselinePharmacy_LastPickupdate'].dt.year.astype(str)
-    #df['BaselineNextAppt_week_year'] = df['BaselineNextAppt'].dt.isocalendar().week.astype(str) + '_' + df['BaselineNextAppt'].dt.year.astype(int).astype(str)
-    df['BaselineNextAppt_week_year'] = df['BaselineNextAppt'].apply(
-            lambda x: f"{x.isocalendar().week}_{x.year}" if pd.notna(x) else ""
-        )
-        
-    # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
-
-    #Fill zero if the column contains number greater than 180
-    df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)
-    
-    #create week_year column for current pharmacy refill
-    df['Pharmacy_LastPickupdate2_week_year'] = df['Pharmacy_LastPickupdate2'].dt.isocalendar().week.astype(str) + '_' + df['Pharmacy_LastPickupdate2'].dt.year.astype(str)
-
-    # Calculate the 'NextAppt' column by adding the 'DaysOfARVRefill2' to 'Pharmacy_LastPickupdate2'
-    df['NextAppt'] = df['Pharmacy_LastPickupdate2'] + pd.to_timedelta(df['DaysOfARVRefill2'], unit='D') 
-    df['IITDate2'] = (df['NextAppt'] + pd.Timedelta(days=29)).fillna('1900')
-    
-    #Clean Next Appointments
-    df['NextAppt'] = pd.to_datetime(df['NextAppt'], errors='coerce').fillna(pd.to_datetime('1900'))
-    df['BaselineNextAppt'] = pd.to_datetime(df['BaselineNextAppt'], errors='coerce').fillna(pd.to_datetime('1900'))
-        
-    df.insert(0, 'S/N.', df.index + 1)
-    
-    #2nd 95 columns integration
-    df['IITDate2'] = pd.to_datetime(df['IITDate2'])
-    df['IITYear'] = df['IITDate2'].dt.year
-    df['NextApptMonthYear'] = df['NextAppt'].fillna('1900').dt.month.astype(int).astype(str) + '_' + df['NextAppt'].fillna('1900').dt.year.astype(int).astype(str)
-    print(df['NextApptMonthYear'])
-    print(df['IITYear'])
-    df['CurrentYearIIT'] = df.apply(lambda row: 'CurrentYearIIT' if ((row['IITYear'] == currentyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notCurrentYearIIT', axis=1)
-    df['previousyearIIT'] = df.apply(lambda row: 'previousyearIIT' if ((row['IITYear'] == previousyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notpreviousyearIIT', axis=1) 
-    df['ImminentIIT'] = df.apply(lambda row: 'ImminentIIT' if ((row['NextAppt'] <= today) & ((row['CurrentARTStatus'] == 'Active'))) else 'notImminentIIT', axis=1)
-    df['sevendaysIIT'] = df.apply(lambda row: 'sevendaysIIT' if ((row['IITDate2'] <= sevenDaysIIT) & ((row['CurrentARTStatus'] == 'Active'))) else 'notsevenDaysIIT', axis=1)
-    df['currentmonthexpected'] = df.apply(lambda row: 'currentmonthexpected' if ((row['NextApptMonthYear'] == currentmonthyear) & ((row['CurrentARTStatus'] == 'Active'))) else 'notcurrentmonthexpected', axis=1)
-    df['currentweekexpected'] = df.apply(lambda row: 'currentweekexpected' if ((row['BaselineNextAppt_week_year'] == currentWeekYear) & ((row['CurrentARTStatus'] == 'Active')) & ((row['BaselineCurrentARTStatus'] == 'Active'))) else 'notcurrentweekexpected', axis=1)
-    df['weeklyexpectedrefilled'] = df.apply(lambda row: 'weeklyexpectedrefilled' if ((row['currentweekexpected'] == 'currentweekexpected') & ((row['Pharmacy_LastPickupdate2'] > row['BaselinePharmacy_LastPickupdate']) & (row['NextAppt'] > row['BaselineNextAppt']))) else 'notweeklyexpectedrefilled', axis=1)
-    df['pendingweeklyrefill'] = df.apply(lambda row: 'pendingweeklyrefill' if ((row['BaselineNextAppt_week_year'] == currentWeekYear) & ((row['CurrentARTStatus'] == 'Active')) & ((row['BaselineCurrentARTStatus'] == 'Active')) & ((row['weeklyexpectedrefilled'] == 'notweeklyexpectedrefilled'))) else 'notpendingweeklyrefill', axis=1)
-    #df.to_excel("refillrate.xlsx")
+    df = integrate_baseline_data(df, dfbaseline)
+    df = compute_appointment_and_iit_dates(df)
+    df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
@@ -307,11 +186,6 @@ def Second95R(df, dfbaseline, endDate):
     #format and export
     formatted_period = endDate.strftime("%d-%m-%Y")
 
-    # Create a Pandas Excel writer using XlsxWriter as the engine.
-    output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
-    workbook = writer.book
-
     # List of dataframes and their corresponding sheet names
     dataframes = {
         "CURRENT FY IIT": dfCurrentYearIIT,
@@ -345,87 +219,17 @@ def Second95RCMG(df, dfbaseline, endDate):
     #add case managers and next appt to the dataframe
     df['CaseManager'] = df['CaseManager'].fillna('UNASSIGNED')
     
-    #declaver variables for analysis
-    today = pd.Timestamp(endDate)
-    currentyear = today.year
-    previousyear = today.year-1
-    currentmonthyear = str(today.month) + '_' + str(today.year)
-    sevenDaysIIT = today + pd.Timedelta(days=7)
-    currentWeekYear = f"{today.isocalendar().week}_{today.year}"
-    currentWeek = today.isocalendar().week
-    print(currentWeekYear)
-    
-    #Bring in Values from baseline ART line list
-    df['BaselineCurrentARTStatus']=df['uuid'].map(dfbaseline.set_index('uuid')['CurrentARTStatus'])
-    df['BaselinePharmacy_LastPickupdate']=df['uuid'].map(dfbaseline.set_index('uuid')['Pharmacy_LastPickupdate'])
-    df['BaselineDaysOfARVRefill']=df['uuid'].map(dfbaseline.set_index('uuid')['DaysOfARVRefill'])
-    
-    #Calculate Next Appointment for Added baseline columns
-    df['BaselinePharmacy_LastPickupdate'] = pd.to_datetime(df['BaselinePharmacy_LastPickupdate'], errors='coerce', dayfirst=True).fillna(pd.to_datetime('1900'))
-    df['BaselineDaysOfARVRefill'] = pd.to_numeric(df['BaselineDaysOfARVRefill'], errors='coerce')
-    df['BaselineDaysOfARVRefill'] = df['BaselineDaysOfARVRefill'].apply(lambda x: 0 if pd.notnull(x) and x > 180 else x)
-    df['BaselineNextAppt'] = df['BaselinePharmacy_LastPickupdate'] + pd.to_timedelta(df['BaselineDaysOfARVRefill'], unit='D') 
-    
-    #Create week year columns for baseline last pickup date and baseline next appointment
-    df['BaselinePharmacy_LastPickupdate_week_year'] = df['BaselinePharmacy_LastPickupdate'].dt.isocalendar().week.astype(str) + '_' + df['BaselinePharmacy_LastPickupdate'].dt.year.astype(str)
-    #df['BaselineNextAppt_week_year'] = df['BaselineNextAppt'].dt.isocalendar().week.astype(str) + '_' + df['BaselineNextAppt'].dt.year.astype(int).astype(str)
-    df['BaselineNextAppt_week_year'] = df['BaselineNextAppt'].apply(
-            lambda x: f"{x.isocalendar().week}_{x.year}" if pd.notna(x) else ""
-        )
-        
-    # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce', dayfirst=True).fillna(pd.to_datetime('1900'))
-
-    #Fill zero if the column contains number greater than 180
-    df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)
-    
-    #create week_year column for current pharmacy refill
-    df['Pharmacy_LastPickupdate2_week_year'] = df['Pharmacy_LastPickupdate2'].dt.isocalendar().week.astype(str) + '_' + df['Pharmacy_LastPickupdate2'].dt.year.astype(str)
-
-    # Calculate the 'NextAppt' column by adding the 'DaysOfARVRefill2' to 'Pharmacy_LastPickupdate2'
-    df['NextAppt'] = df['Pharmacy_LastPickupdate2'] + pd.to_timedelta(df['DaysOfARVRefill2'], unit='D') 
-    df['IITDate2'] = (df['NextAppt'] + pd.Timedelta(days=29)).fillna('1900')
-        
-    #Clean Next Appointments
-    df['NextAppt'] = pd.to_datetime(df['NextAppt'], errors='coerce').fillna(pd.to_datetime('1900'))
-    df['BaselineNextAppt'] = pd.to_datetime(df['BaselineNextAppt'], errors='coerce').fillna(pd.to_datetime('1900'))
-        
-    df.insert(0, 'S/N.', df.index + 1)
-    
-    #2nd 95 columns integration
-    df['IITDate2'] = pd.to_datetime(df['IITDate2'])
-    df['IITYear'] = df['IITDate2'].dt.year
-    df['NextApptMonthYear'] = df['NextAppt'].fillna('1900').dt.month.astype(int).astype(str) + '_' + df['NextAppt'].fillna('1900').dt.year.astype(int).astype(str)
-    print(df['NextApptMonthYear'])
-    print(df['IITYear'])
-    df['CurrentYearIIT'] = df.apply(lambda row: 'CurrentYearIIT' if ((row['IITYear'] == currentyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notCurrentYearIIT', axis=1)
-    df['previousyearIIT'] = df.apply(lambda row: 'previousyearIIT' if ((row['IITYear'] == previousyear) & (row['IITDate2'] <= today) & (row['CurrentARTStatus'] in ['LTFU', 'Lost to followup'])) else 'notpreviousyearIIT', axis=1) 
-    df['ImminentIIT'] = df.apply(lambda row: 'ImminentIIT' if ((row['NextAppt'] <= today) & ((row['CurrentARTStatus'] == 'Active'))) else 'notImminentIIT', axis=1)
-    df['sevendaysIIT'] = df.apply(lambda row: 'sevendaysIIT' if ((row['IITDate2'] <= sevenDaysIIT) & ((row['CurrentARTStatus'] == 'Active'))) else 'notsevenDaysIIT', axis=1)
-    df['currentmonthexpected'] = df.apply(lambda row: 'currentmonthexpected' if ((row['NextApptMonthYear'] == currentmonthyear) & ((row['CurrentARTStatus'] == 'Active'))) else 'notcurrentmonthexpected', axis=1)
-    df['currentweekexpected'] = df.apply(lambda row: 'currentweekexpected' if ((row['BaselineNextAppt_week_year'] == currentWeekYear) & ((row['CurrentARTStatus'] == 'Active')) & ((row['BaselineCurrentARTStatus'] == 'Active'))) else 'notcurrentweekexpected', axis=1)
-    df['weeklyexpectedrefilled'] = df.apply(lambda row: 'weeklyexpectedrefilled' if ((row['currentweekexpected'] == 'currentweekexpected') & ((row['Pharmacy_LastPickupdate2'] > row['BaselinePharmacy_LastPickupdate']) & (row['NextAppt'] > row['BaselineNextAppt']))) else 'notweeklyexpectedrefilled', axis=1)
-    df['pendingweeklyrefill'] = df.apply(lambda row: 'pendingweeklyrefill' if ((row['BaselineNextAppt_week_year'] == currentWeekYear) & ((row['CurrentARTStatus'] == 'Active')) & ((row['BaselineCurrentARTStatus'] == 'Active')) & ((row['weeklyexpectedrefilled'] == 'notweeklyexpectedrefilled'))) else 'notpendingweeklyrefill', axis=1)
-    #df.to_excel("refillrate.xlsx")
-    
-    #Filter and process line list        
-    columns_to_select = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated", "CaseManager"]
-    
-    #function to process line list
-    def process_Linelist(df, column_name, filter_value, columns_to_select):
-        df_filtered = df[df[column_name] == filter_value].reset_index(drop=True)
-        df_sorted = df_filtered.sort_values(by='CaseManager', ascending=True).reset_index(drop=True)
-        df_sorted.insert(0, 'S/N', df_sorted.index + 1)
-        df_selected = df_sorted[columns_to_select]
-        return df_selected
+    df = integrate_baseline_data(df, dfbaseline)
+    df = compute_appointment_and_iit_dates(df)
+    df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     
     #apply function to process line list
-    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select)
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select)
-    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select)
-    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select)
-    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select)
-    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select) 
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by='CaseManager')
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
+    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select, sort_by='CaseManager') 
     
     df2nd95Summary = df
 
@@ -483,4 +287,3 @@ def Second95RCMG(df, dfbaseline, endDate):
         mergeNum=2 #merge first three columns for the summary total row
     )
     return filename
-
