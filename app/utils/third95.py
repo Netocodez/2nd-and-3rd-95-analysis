@@ -17,7 +17,7 @@ def third95(df, end_date):
     # --- The rest of the logic goes here ---
     
     # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
+    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce', dayfirst=True).fillna(pd.to_datetime('1900'))
 
     #Fill zero if the column contains number greater than 180
     df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)

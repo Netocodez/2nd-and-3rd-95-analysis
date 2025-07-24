@@ -40,7 +40,7 @@ def fetch_data():
         # === CASE 2: file1 + file2 ===
         elif file2 and is_allowed_file(file2.filename) and not file3:
             df_baseline = load_file(file2)
-            df = df.merge(df_baseline, on='uuid', how='left', suffixes=('', '_baseline'))
+            df = df.merge(df_baseline[['uuid', 'CurrentARTStatus']], on='uuid', how='left', suffixes=('', '_baseline'))
             df['ARTStatus_PreviousQuarter'] = df['CurrentARTStatus_baseline']
             output_filename = third95(df, end_date)
 
@@ -58,11 +58,13 @@ def fetch_data():
         # === CASE 4: file1 + file2 + file3 ===
         elif file2 and is_allowed_file(file2.filename) and file3 and is_allowed_file(file3.filename):
             df_baseline = load_file(file2)
-            df = df.merge(df_baseline, on='uuid', how='left', suffixes=('', '_baseline'))
+            df = df.merge(df_baseline[['uuid', 'CurrentARTStatus']], on='uuid', how='left', suffixes=('', '_baseline'))
             df['ARTStatus_PreviousQuarter'] = df['CurrentARTStatus_baseline']
+            #df.to_excel('dfbaseline.xlsx', index=False)  # Debugging line to check df structure
 
             df_cmg = load_file(file3)
             if 'uuid' in df_cmg.columns and 'CASE MANAGER' in df_cmg.columns:
+                df_cmg = df_cmg[['uuid', 'CASE MANAGER']]
                 df = df.merge(df_cmg, on='uuid', how='left')
                 df['CaseManager'] = df['CASE MANAGER'].fillna('Unassigned')
             else:
