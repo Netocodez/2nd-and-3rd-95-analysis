@@ -33,6 +33,7 @@ def third95(df, end_date):
     today = pd.to_datetime(endDate)
     df['end_date'] = today
     df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
+    #df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce')
 
     # Function to calculate difference in months
     def date_diff_in_months2(date1, date2):
@@ -48,6 +49,7 @@ def third95(df, end_date):
     # Get the current date
     #today = pd.Timestamp('today')
     today = pd.to_datetime(endDate)
+    currentWeek = today.isocalendar().week
     last_30_days = today - pd.Timedelta(days=29)
     next_30_days = today + pd.Timedelta(days=29)
 
@@ -64,6 +66,7 @@ def third95(df, end_date):
     df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
     df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
     df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
+    df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek)) else 'NotvlWKMissedSC', axis=1)
     df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)  
     df['last30daysmissedSC'] = df.apply(lambda row: 'Missed SC' if ((row['vlSCGap'] == 'SC Gap') & (row['Pharmacy_LastPickupdate'] >= last_30_days) & (row['Pharmacy_LastPickupdate'] < today)) else 'Not Missed SC', axis=1)  
     df['expNext30daysdueforSC'] = df.apply(lambda row: 'due for SC' if ((row['vlSCGap'] == 'SC Gap') & (row['NextAppt'] >= today) & (row['NextAppt'] < next_30_days)) else 'Not due for SC', axis=1)  
@@ -75,7 +78,8 @@ def third95(df, end_date):
     df_pending_results = process_Linelist(df, 'PendingResult', 'Pending', columns_to_select2)
     df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select2)
     df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select2)
-    df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select2)            
+    df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select2)       
+    df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select2)        
     
     df_active_Eligible = df[df['CurrentARTStatus']=="Active"]
 
@@ -87,14 +91,15 @@ def third95(df, end_date):
     df_active_Eligible['last30daysmissedSC'] = df_active_Eligible['last30daysmissedSC'].apply(lambda x: 1 if x == "Missed SC" else 0)
     df_active_Eligible['expNext30daysdueforSC'] = df_active_Eligible['expNext30daysdueforSC'].apply(lambda x: 1 if x == "due for SC" else 0)
     df_active_Eligible['Suppressed'] = df_active_Eligible['Suppression'].apply(lambda x: 1 if x == "Suppressed" else 0)
+    df_active_Eligible['vlWKMissedSC'] = df_active_Eligible['vlWKMissedSC'].apply(lambda x: 1 if x == "vlWKMissedSC" else 0)
 
-    result = df_active_Eligible.groupby(['LGA','FacilityName'])[['vlEligible', 'validVlResult_valid', 'validVlSampleCollection','vlSCGap', 'PendingResult','last30daysmissedSC','expNext30daysdueforSC','Suppressed']].sum().reset_index()
+    result = df_active_Eligible.groupby(['LGA','FacilityName'])[['vlEligible', 'validVlResult_valid', 'validVlSampleCollection','vlSCGap', 'PendingResult','last30daysmissedSC','expNext30daysdueforSC','Suppressed','vlWKMissedSC']].sum().reset_index()
 
     result['vl_result_rate'] = ((result['validVlResult_valid'] / result['vlEligible'])).round(4)
     result['sample_collection_rate'] = ((result['validVlSampleCollection'] / result['vlEligible'])).round(4)
     result['suppression_rate'] = ((result['Suppressed'] / result['validVlResult_valid'])).round(4)
     
-    result = result[['LGA','FacilityName','vlEligible','validVlResult_valid','Suppressed','vl_result_rate','suppression_rate','validVlSampleCollection','sample_collection_rate','vlSCGap','PendingResult','last30daysmissedSC','expNext30daysdueforSC']]
+    result = result[['LGA','FacilityName','vlEligible','validVlResult_valid','Suppressed','vl_result_rate','suppression_rate','validVlSampleCollection','sample_collection_rate','vlSCGap','PendingResult','last30daysmissedSC','expNext30daysdueforSC','vlWKMissedSC']]
 
     result = result.rename(columns={'validVlSampleCollection': 'Valid VL Samples',
                                     'validVlResult_valid': 'Valid VL Results',
@@ -106,6 +111,7 @@ def third95(df, end_date):
                                     'vlSCGap': 'VL Sample Collection Gap',
                                     'last30daysmissedSC': 'Last 30 days Missed VL SC',
                                     'expNext30daysdueforSC': 'Expected Next 30 days due for VL SC',
+                                    'vlWKMissedSC': 'Weekly VL SC Missed Oppurtunity',
                                     'Suppression': 'Suppressed',})
 
     output = BytesIO()
@@ -119,6 +125,7 @@ def third95(df, end_date):
         "LAST 30 DAYS MISSED SC": df_last30daysmissedSC,
         "EXP NEXT 30 DAYS DUE FOR SC": df_expNext30daysdueforSC,
         "UNSUPPRESSED RESULTS": df_Suppression,
+        "WK SC Missed Oppurtunity": df_vlWKMissedSC,
         "3RD 95 SUMMARY": result,
         #"Sheet3": df3,
         # Add more dataframes and sheet names as needed
@@ -283,7 +290,7 @@ def third95CMG(df, end_date):
         df['CaseManager'] = df['CaseManager'].fillna('UNASSIGNED')
               
         # Ensure the 'Pharmacy_LastPickupdate' column is in datetime format and fill NaNs with a specific date
-        df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce').fillna(pd.to_datetime('1900'))
+        df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce', dayfirst=True).fillna(pd.to_datetime('1900'))
 
         #Fill zero if the column contains number greater than 180
         df['DaysOfARVRefill2'] = df['DaysOfARVRefill'].apply(lambda x: 0 if x > 180 else x)
@@ -297,6 +304,7 @@ def third95CMG(df, end_date):
         df = df[(df['CurrentARTStatus'] == 'Active') & (df['ARTStatus_PreviousQuarter'] =='Active')]
 
         today = pd.to_datetime(endDate)
+        currentWeek = today.isocalendar().week
         df['end_date'] = today
         df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
 
@@ -334,6 +342,7 @@ def third95CMG(df, end_date):
         df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
         df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
         df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
+        df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek)) else 'NotvlWKMissedSC', axis=1)
         df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)    
         df['last30daysmissedSC'] = df.apply(lambda row: 'Missed SC' if ((row['vlSCGap'] == 'SC Gap') & (row['Pharmacy_LastPickupdate'] >= last_30_days) & (row['Pharmacy_LastPickupdate'] < today)) else 'Not Missed SC', axis=1)  
         df['expNext30daysdueforSC'] = df.apply(lambda row: 'due for SC' if ((row['vlSCGap'] == 'SC Gap') & (row['NextAppt'] >= today) & (row['NextAppt'] < next_30_days)) else 'Not due for SC', axis=1)  
@@ -346,6 +355,7 @@ def third95CMG(df, end_date):
         df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select, sort_by='CaseManager')
         df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select, sort_by='CaseManager')
         df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select, sort_by='CaseManager')  
+        df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select, sort_by='CaseManager')   
         
         df_active_Eligible = df[df['CurrentARTStatus']=="Active"]
 
@@ -357,15 +367,16 @@ def third95CMG(df, end_date):
         df_active_Eligible['last30daysmissedSC'] = df_active_Eligible['last30daysmissedSC'].apply(lambda x: 1 if x == "Missed SC" else 0)
         df_active_Eligible['expNext30daysdueforSC'] = df_active_Eligible['expNext30daysdueforSC'].apply(lambda x: 1 if x == "due for SC" else 0)
         df_active_Eligible['Suppressed'] = df_active_Eligible['Suppression'].apply(lambda x: 1 if x == "Suppressed" else 0)
+        df_active_Eligible['vlWKMissedSC'] = df_active_Eligible['vlWKMissedSC'].apply(lambda x: 1 if x == "vlWKMissedSC" else 0)
 
         #result = df_active_Eligible.groupby(['LGA','FacilityName','CaseManager'])[['vlEligible', 'validVlResult_valid', 'validVlSampleCollection','vlSCGap', 'PendingResult']].sum().reset_index()
-        result = df_active_Eligible.groupby(['LGA','FacilityName','CaseManager'])[['vlEligible', 'validVlResult_valid', 'validVlSampleCollection','vlSCGap', 'PendingResult','last30daysmissedSC','expNext30daysdueforSC','Suppressed']].sum().reset_index()
+        result = df_active_Eligible.groupby(['LGA','FacilityName','CaseManager'])[['vlEligible', 'validVlResult_valid', 'validVlSampleCollection','vlSCGap', 'PendingResult','last30daysmissedSC','expNext30daysdueforSC','Suppressed','vlWKMissedSC']].sum().reset_index()
 
         result['vl_result_rate'] = ((result['validVlResult_valid'] / result['vlEligible'])).round(4)
         result['sample_collection_rate'] = ((result['validVlSampleCollection'] / result['vlEligible'])).round(4)
         result['suppression_rate'] = ((result['Suppressed'] / result['validVlResult_valid'])).round(4)
         
-        result = result[['LGA','FacilityName','CaseManager','vlEligible','validVlResult_valid','Suppressed','vl_result_rate','suppression_rate','validVlSampleCollection','sample_collection_rate','vlSCGap','PendingResult','last30daysmissedSC','expNext30daysdueforSC']]
+        result = result[['LGA','FacilityName','CaseManager','vlEligible','validVlResult_valid','Suppressed','vl_result_rate','suppression_rate','validVlSampleCollection','sample_collection_rate','vlSCGap','PendingResult','last30daysmissedSC','expNext30daysdueforSC','vlWKMissedSC']]
 
         result = result.rename(columns={'validVlSampleCollection': 'Valid VL Samples',
                                         'validVlResult_valid': 'Valid VL Results',
@@ -377,6 +388,7 @@ def third95CMG(df, end_date):
                                         'vlSCGap': 'VL Sample Collection Gap',
                                         'last30daysmissedSC': 'Last 30 days Missed VL SC',
                                         'expNext30daysdueforSC': 'Expected Next 30 days due for VL SC',
+                                        'vlWKMissedSC': 'Weekly VL SC Missed Oppurtunity',
                                         'Suppression': 'Suppressed',})
         
         #format and export
@@ -396,6 +408,7 @@ def third95CMG(df, end_date):
             "LAST 30 DAYS MISSED SC": df_last30daysmissedSC,
             "EXP NEXT 30 DAYS DUE FOR SC": df_expNext30daysdueforSC,
             "UNSUPPRESSED RESULTS": df_Suppression,
+            "WK SC Missed Oppurtunity": df_vlWKMissedSC,
             "3RD 95 SUMMARY": result,
             #"Sheet3": df3,
             # Add more dataframes and sheet names as needed

@@ -17,24 +17,30 @@ def second95(df, endDate):
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     
+    #df.to_excel('temp.xlsx', index=False)
+    
     #Generate line lists
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)    
     dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
         
     df2nd95Summary = df
 
     df2nd95Summary['ActiveClients'] = df2nd95Summary['CurrentARTStatus'].apply(lambda x: 1 if x == "Active" else 0)
     df2nd95Summary['currentYearIIT'] = df2nd95Summary['CurrentYearIIT'].apply(lambda x: 1 if x == "CurrentYearIIT" else 0)
+    df2nd95Summary['CurrentWeekIIT'] = df2nd95Summary['CurrentWeekIIT'].apply(lambda x: 1 if x == "CurrentWeekIIT" else 0)
     df2nd95Summary['previousyearIIT'] = df2nd95Summary['previousyearIIT'].apply(lambda x: 1 if x == "previousyearIIT" else 0)
     df2nd95Summary['ImminentIIT'] = df2nd95Summary['ImminentIIT'].apply(lambda x: 1 if x == "ImminentIIT" else 0)
     df2nd95Summary['sevendaysIIT'] = df2nd95Summary['sevendaysIIT'].apply(lambda x: 1 if x == "sevendaysIIT" else 0)
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
+    df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
+    df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected']
+    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
     result = result[(result[result_check] != 0).any(axis=1)]
 
 
@@ -43,6 +49,9 @@ def second95(df, endDate):
                                     'previousyearIIT': 'previous FY IIT',
                                     'ImminentIIT': 'Imminent IIT',
                                     'sevendaysIIT': 'Next 7 days IIT',
+                                    'CurrentWeekIIT': 'Curr Week IIT',
+                                    'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
+                                    'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
                                     'currentmonthexpected': 'EXPECTED THIS MONTH',})
     result   
     
@@ -56,6 +65,7 @@ def second95(df, endDate):
         "IMMINENT IIT": dfImminentIIT,
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
+        "CURRENT FY LOSSES": dfCurrentYearLosses,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -88,18 +98,22 @@ def second95CMG(df, endDate):
     dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by='CaseManager')
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
     
     df2nd95Summary = df
 
     df2nd95Summary['ActiveClients'] = df2nd95Summary['CurrentARTStatus'].apply(lambda x: 1 if x == "Active" else 0)
     df2nd95Summary['currentYearIIT'] = df2nd95Summary['CurrentYearIIT'].apply(lambda x: 1 if x == "CurrentYearIIT" else 0)
+    df2nd95Summary['CurrentWeekIIT'] = df2nd95Summary['CurrentWeekIIT'].apply(lambda x: 1 if x == "CurrentWeekIIT" else 0)
     df2nd95Summary['previousyearIIT'] = df2nd95Summary['previousyearIIT'].apply(lambda x: 1 if x == "previousyearIIT" else 0)
     df2nd95Summary['ImminentIIT'] = df2nd95Summary['ImminentIIT'].apply(lambda x: 1 if x == "ImminentIIT" else 0)
     df2nd95Summary['sevendaysIIT'] = df2nd95Summary['sevendaysIIT'].apply(lambda x: 1 if x == "sevendaysIIT" else 0)
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
+    df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
+    df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected']
+    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
     result = result[(result[result_check] != 0).any(axis=1)]
 
 
@@ -108,6 +122,9 @@ def second95CMG(df, endDate):
                                     'previousyearIIT': 'previous FY IIT',
                                     'ImminentIIT': 'Imminent IIT',
                                     'sevendaysIIT': 'Next 7 days IIT',
+                                    'CurrentWeekIIT': 'Curr Week IIT',
+                                    'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
+                                    'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
                                     'currentmonthexpected': 'EXPECTED THIS MONTH',})
     result   
     
@@ -121,6 +138,7 @@ def second95CMG(df, endDate):
         "IMMINENT IIT": dfImminentIIT,
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
+        "CURRENT FY LOSSES": dfCurrentYearLosses,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -152,24 +170,28 @@ def Second95R(df, dfbaseline, endDate):
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
     dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select2)
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
     
     df2nd95Summary = df
 
     df2nd95Summary['ActiveClients'] = df2nd95Summary['CurrentARTStatus'].apply(lambda x: 1 if x == "Active" else 0)
     df2nd95Summary['currentYearIIT'] = df2nd95Summary['CurrentYearIIT'].apply(lambda x: 1 if x == "CurrentYearIIT" else 0)
+    df2nd95Summary['CurrentWeekIIT'] = df2nd95Summary['CurrentWeekIIT'].apply(lambda x: 1 if x == "CurrentWeekIIT" else 0)
     df2nd95Summary['previousyearIIT'] = df2nd95Summary['previousyearIIT'].apply(lambda x: 1 if x == "previousyearIIT" else 0)
     df2nd95Summary['ImminentIIT'] = df2nd95Summary['ImminentIIT'].apply(lambda x: 1 if x == "ImminentIIT" else 0)
     df2nd95Summary['sevendaysIIT'] = df2nd95Summary['sevendaysIIT'].apply(lambda x: 1 if x == "sevendaysIIT" else 0)
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
     df2nd95Summary['currentweekexpected'] = df2nd95Summary['currentweekexpected'].apply(lambda x: 1 if x == "currentweekexpected" else 0)
     df2nd95Summary['weeklyexpectedrefilled'] = df2nd95Summary['weeklyexpectedrefilled'].apply(lambda x: 1 if x == "weeklyexpectedrefilled" else 0)
+    df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
+    df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled']
+    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
     result = result[(result[result_check] != 0).any(axis=1)]
     
     result['Weekly_Refill_Rate'] = ((result['weeklyexpectedrefilled'] / result['currentweekexpected'])).round(4)
-    result = result[['LGA','FacilityName','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT']]
+    result = result[['LGA','FacilityName','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']]
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -180,6 +202,9 @@ def Second95R(df, dfbaseline, endDate):
                                     'currentmonthexpected': 'EXPECTED THIS MONTH',
                                     'currentweekexpected': 'EXPECTED THIS WEEK',
                                     'weeklyexpectedrefilled': 'REFILLED FROM WEEKLY EXPECTED',
+                                    'CurrentWeekIIT': 'Curr Week IIT',
+                                    'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
+                                    'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
                                     'Weekly_Refill_Rate': '%Weekly Refill Rate',})
     result   
     
@@ -194,6 +219,7 @@ def Second95R(df, dfbaseline, endDate):
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "EXPECTED THIS WEEK": dfpendingweeklyrefill,
+        "CURRENT FY LOSSES": dfCurrentYearLosses,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -230,24 +256,28 @@ def Second95RCMG(df, dfbaseline, endDate):
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
     dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select, sort_by='CaseManager') 
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
     
     df2nd95Summary = df
 
     df2nd95Summary['ActiveClients'] = df2nd95Summary['CurrentARTStatus'].apply(lambda x: 1 if x == "Active" else 0)
     df2nd95Summary['currentYearIIT'] = df2nd95Summary['CurrentYearIIT'].apply(lambda x: 1 if x == "CurrentYearIIT" else 0)
+    df2nd95Summary['CurrentWeekIIT'] = df2nd95Summary['CurrentWeekIIT'].apply(lambda x: 1 if x == "CurrentWeekIIT" else 0)
     df2nd95Summary['previousyearIIT'] = df2nd95Summary['previousyearIIT'].apply(lambda x: 1 if x == "previousyearIIT" else 0)
     df2nd95Summary['ImminentIIT'] = df2nd95Summary['ImminentIIT'].apply(lambda x: 1 if x == "ImminentIIT" else 0)
     df2nd95Summary['sevendaysIIT'] = df2nd95Summary['sevendaysIIT'].apply(lambda x: 1 if x == "sevendaysIIT" else 0)
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
     df2nd95Summary['currentweekexpected'] = df2nd95Summary['currentweekexpected'].apply(lambda x: 1 if x == "currentweekexpected" else 0)
     df2nd95Summary['weeklyexpectedrefilled'] = df2nd95Summary['weeklyexpectedrefilled'].apply(lambda x: 1 if x == "weeklyexpectedrefilled" else 0)
+    df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
+    df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled']
+    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
     result = result[(result[result_check] != 0).any(axis=1)]
     
     result['Weekly_Refill_Rate'] = ((result['weeklyexpectedrefilled'] / result['currentweekexpected'])).round(4)
-    result = result[['LGA','FacilityName','CaseManager','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT']]
+    result = result[['LGA','FacilityName','CaseManager','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']]
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -258,6 +288,9 @@ def Second95RCMG(df, dfbaseline, endDate):
                                     'currentmonthexpected': 'EXPECTED THIS MONTH',
                                     'currentweekexpected': 'EXPECTED THIS WEEK',
                                     'weeklyexpectedrefilled': 'REFILLED FROM WEEKLY EXPECTED',
+                                    'CurrentWeekIIT': 'Curr Week IIT',
+                                    'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
+                                    'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
                                     'Weekly_Refill_Rate': '%Weekly Refill Rate',})
     result   
     
@@ -272,6 +305,7 @@ def Second95RCMG(df, dfbaseline, endDate):
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "EXPECTED THIS WEEK": dfpendingweeklyrefill,
+        "CURRENT FY LOSSES": dfCurrentYearLosses,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
