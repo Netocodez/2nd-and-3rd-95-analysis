@@ -31,7 +31,10 @@ def third95(df, end_date):
     df = df[(df['CurrentARTStatus'] == 'Active') & (df['ARTStatus_PreviousQuarter'] =='Active')]
 
     today = pd.to_datetime(endDate)
-    df['end_date'] = today
+    endOfThisQuarter = pd.to_datetime(today) + pd.tseries.offsets.QuarterEnd(0)
+    logging.info(f"End of Current Quarter: {endOfThisQuarter}")    
+    
+    df['end_date'] = endOfThisQuarter
     df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
     #df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce')
 
@@ -41,7 +44,10 @@ def third95(df, end_date):
 
     # Apply the function to the DataFrame
     df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
-
+    
+    # Flag those who are already ≥ 6 months as at today
+    df['eligible_today'] = df['ARTStartDate2'].apply(lambda d: date_diff_in_months2(d, today) >= 6)
+             
     #drop irrelevant columns and extract actual VL eligible from dataframe
     df = df.drop(['end_date','ARTStartDate2'], axis=1)
     df = df[df['durationOnART'] >= 6]
@@ -57,7 +63,7 @@ def third95(df, end_date):
     last_year = today - pd.DateOffset(years=1)
     first_quarter_last_year = pd.to_datetime(last_year) + pd.tseries.offsets.QuarterEnd(0)
 
-    logging.info(f"First quarter end from last year: {first_quarter_last_year}")  
+    logging.info(f"First quarter end from last year: {first_quarter_last_year}")
     
     #convert NextAppt to datetime
     df['NextAppt'] = pd.to_datetime(df['NextAppt'])
@@ -66,7 +72,7 @@ def third95(df, end_date):
     df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
     df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
     df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
-    df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek)) else 'NotvlWKMissedSC', axis=1)
+    df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek) and row['eligible_today']) else 'NotvlWKMissedSC', axis=1)
     df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)  
     df['last30daysmissedSC'] = df.apply(lambda row: 'Missed SC' if ((row['vlSCGap'] == 'SC Gap') & (row['Pharmacy_LastPickupdate'] >= last_30_days) & (row['Pharmacy_LastPickupdate'] < today)) else 'Not Missed SC', axis=1)  
     df['expNext30daysdueforSC'] = df.apply(lambda row: 'due for SC' if ((row['vlSCGap'] == 'SC Gap') & (row['NextAppt'] >= today) & (row['NextAppt'] < next_30_days)) else 'Not due for SC', axis=1)  
@@ -305,7 +311,11 @@ def third95CMG(df, end_date):
 
         today = pd.to_datetime(endDate)
         currentWeek = today.isocalendar().week
-        df['end_date'] = today
+        
+        endOfThisQuarter = pd.to_datetime(today) + pd.tseries.offsets.QuarterEnd(0)
+        logging.info(f"End of Current Quarter: {endOfThisQuarter}")    
+        
+        df['end_date'] = endOfThisQuarter
         df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
 
         # Function to calculate difference in months
@@ -314,6 +324,9 @@ def third95CMG(df, end_date):
 
         # Apply the function to the DataFrame
         df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
+        
+        # Flag those who are already ≥ 6 months as at today
+        df['eligible_today'] = df['ARTStartDate2'].apply(lambda d: date_diff_in_months2(d, today) >= 6)
 
         #drop irrelevant columns and extract actual VL eligible from dataframe
         df = df.drop(['end_date','ARTStartDate2'], axis=1)
@@ -342,7 +355,7 @@ def third95CMG(df, end_date):
         df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
         df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
         df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
-        df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek)) else 'NotvlWKMissedSC', axis=1)
+        df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek) and row['eligible_today']) else 'NotvlWKMissedSC', axis=1)
         df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)    
         df['last30daysmissedSC'] = df.apply(lambda row: 'Missed SC' if ((row['vlSCGap'] == 'SC Gap') & (row['Pharmacy_LastPickupdate'] >= last_30_days) & (row['Pharmacy_LastPickupdate'] < today)) else 'Not Missed SC', axis=1)  
         df['expNext30daysdueforSC'] = df.apply(lambda row: 'due for SC' if ((row['vlSCGap'] == 'SC Gap') & (row['NextAppt'] >= today) & (row['NextAppt'] < next_30_days)) else 'Not due for SC', axis=1)  
