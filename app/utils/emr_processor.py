@@ -170,162 +170,181 @@ def sc_gap_mask(
 
     return mask
 
-def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY", division_columns=None, color_column="%Weekly Refill Rate", column_widths=None, mergeNum=2, row_masks=None):
-    
+def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY",
+                                    division_columns=None, color_column="%Weekly Refill Rate",
+                                    column_widths=None, mergeNum=2, row_masks=None):
+
     if row_masks is None:
         row_masks = {}
-    
+
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine="xlsxwriter")
-    
-    # Strip time from datetime columns to ensure clean yyyy-mm-dd export
-    for df_name, df_data in dataframes.items():
-        for col in df_data.columns:
-            if pd.api.types.is_datetime64_any_dtype(df_data[col]):
-                df_data[col] = df_data[col].dt.date
 
-    for sheet_name, dataframe in dataframes.items():
-        dataframe.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
+    # ----------------------------
+    # Strip datetime columns
+    # ----------------------------
+    for df_name, df in dataframes.items():
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                df[col] = df[col].dt.date
 
+    # ----------------------------
+    # Process each sheet
+    # ----------------------------
+    for sheet_name, df in dataframes.items():
+        df.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
 
-        # Header format
+        # ----------------------------
+        # Formats
+        # ----------------------------
         header_format = workbook.add_format({
-            "bold": True,
-            "text_wrap": True,
-            "valign": "bottom",
-            "fg_color": "#D7E4BC",
-            "border": 1,
+            "bold": True, "text_wrap": True, "valign": "bottom",
+            "fg_color": "#D7E4BC", "border": 1
         })
-
-        # Percentage formats
         percentage_format = workbook.add_format({'num_format': '0.00%'})
-        percentage_format_bold = workbook.add_format({
-            "bold": True,
-            "text_wrap": True,
-            "valign": "bottom",
-            "fg_color": "#D7E4BC",
-            "border": 1,
-            'num_format': '0.00%',
+        percentage_bold = workbook.add_format({
+            "bold": True, "text_wrap": True, "valign": "bottom",
+            "fg_color": "#D7E4BC", "border": 1, 'num_format': '0.00%'
         })
+        row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
+        alert_format = workbook.add_format({'bg_color': '#FFA500'})
+        mask_format = workbook.add_format({'bg_color': '#FFEB9C'})
+        title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
 
-        # Write column headers
-        for col_num, value in enumerate(dataframe.columns.values):
+        # ----------------------------
+        # Write headers
+        # ----------------------------
+        for col_num, value in enumerate(df.columns):
             worksheet.write(0, col_num, value, header_format)
 
+        # ----------------------------
+        # Summary Sheet
+        # ----------------------------
         if sheet_name == summaryName:
             # Title
-            title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
-            worksheet.merge_range(0, 0, 0, len(dataframe.columns) - 1, f'{summaryName} AS AT {formatted_period}', title_format)
-
-            # Rewrite headers and data starting from row 2
-            dataframe.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
-            for col_num, value in enumerate(dataframe.columns.values):
+            worksheet.merge_range(0, 0, 0, len(df.columns)-1, f'{summaryName} AS AT {formatted_period}', title_format)
+            # Rewrite headers/data starting row 2
+            df.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+            for col_num, value in enumerate(df.columns):
                 worksheet.write(1, col_num, value, header_format)
 
-            # Apply color scale to multiple columns if specified
-            if isinstance(color_column, (list, tuple)):
-                color_columns = color_column
-            else:
-                color_columns = [color_column]
-
+            # Color scale
+            color_columns = color_column if isinstance(color_column, (list, tuple)) else [color_column]
             for col in color_columns:
-                if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
-                    col_index = dataframe.columns.get_loc(col)
+                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                    idx = df.columns.get_loc(col)
                     worksheet.conditional_format(
-                        2, col_index, len(dataframe) + 1, col_index,
-                        {
-                            'type': '3_color_scale',
-                            'min_color': '#F8696B',
-                            'mid_color': '#FFEB84',
-                            'max_color': '#63BE7B',
-                        }
+                        2, idx, len(df)+1, idx,
+                        {'type': '3_color_scale', 'min_color': '#F8696B', 'mid_color': '#FFEB84', 'max_color': '#63BE7B'}
                     )
 
             # Row banding
-            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
-            worksheet.conditional_format(2, 0, len(dataframe) + 1, len(dataframe.columns) - 1,
-                                         {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.conditional_format(2, 0, len(df)+1, len(df.columns)-1,
+                                         {'type': 'formula', 'criteria': 'MOD(ROW(),2)=0', 'format': row_band_format})
             worksheet.hide_gridlines(2)
 
-            # Set column widths
+            # Column widths
             if column_widths:
                 for col_range, width in column_widths.items():
                     worksheet.set_column(col_range, width)
-            
+
+            # Division formatting
             if division_columns is None:
-                division_columns = {}  # fallback to empty dict
-            
-            if division_columns:
-                for target_col in division_columns.keys():
-                    worksheet.set_column(f"{target_col}:{target_col}", None, percentage_format)
+                division_columns = {}
+            for col in division_columns.keys():
+                worksheet.set_column(f"{col}:{col}", None, percentage_format)
 
-            # Total row with formulas
+            # Total row
+            total_row = len(df)+2
             header_format.set_align('center')
-            total_row = len(dataframe) + 2
             worksheet.merge_range(total_row, 0, total_row, mergeNum, 'Total', header_format)
-            for col_num in range(1, len(dataframe.columns)):
+            for col_num in range(1, len(df.columns)):
                 col_letter = chr(65 + col_num)
-
                 if col_letter in division_columns:
-                    numerator_col, denominator_col = division_columns[col_letter]
-                    worksheet.write_formula(
-                        total_row,
-                        col_num,
-                        f"SUM({numerator_col}3:{numerator_col}{total_row}) / SUM({denominator_col}3:{denominator_col}{total_row})",
-                        percentage_format_bold
-                    )
+                    num_col, denom_col = division_columns[col_letter]
+                    worksheet.write_formula(total_row, col_num,
+                                            f"SUM({num_col}3:{num_col}{total_row})/SUM({denom_col}3:{denom_col}{total_row})",
+                                            percentage_bold)
                 else:
-                    worksheet.write_formula(
-                        total_row,
-                        col_num,
-                        f"SUM({col_letter}3:{col_letter}{total_row})",
-                        header_format
-                    )
+                    worksheet.write_formula(total_row, col_num, f"SUM({col_letter}3:{col_letter}{total_row})", header_format)
 
-        elif sheet_name != summaryName:
-            
+        # ----------------------------
+        # Non-summary Sheets
+        # ----------------------------
+        else:
             first_col = 0
-            last_col = len(dataframe.columns) - 1
-            
-             # --- Mask highlighting (applied AFTER banding for priority) ---
+            last_col = len(df.columns)-1
+
+            # Notes column for comments
+            notes_col_name = "PatientHospitalNo"
+            if notes_col_name in df.columns:
+                notes_idx = df.columns.get_loc(notes_col_name)
+                for row_idx in range(len(df)):
+                    alerts = []
+
+                    # Biometrics alert
+                    if "PBS_Capture_Date" in df.columns:
+                        val = df.at[row_idx, "PBS_Capture_Date"]
+                        if pd.isna(val) or val == "":
+                            alerts.append("Needs biometrics capture")
+
+                    # Mask alert
+                    if sheet_name in row_masks and row_idx < len(row_masks[sheet_name]) and row_masks[sheet_name][row_idx]:
+                        alerts.append("Due for sample collection")
+
+                    if alerts:
+                        text = " | ".join(alerts)
+                        worksheet.write_comment(row_idx+1, notes_idx, text, {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
+                        # Highlight only rows with comments
+                        worksheet.conditional_format(row_idx+1, notes_idx, row_idx+1, notes_idx,
+                                                     {'type': 'no_errors', 'format': alert_format})
+
+            # Highlight PBS_Capturee / PBS_Capture_Date
+            if "PBS_Capture_Date" in df.columns and "PBS_Capturee" in df.columns:
+                date_idx = df.columns.get_loc("PBS_Capture_Date")
+                capturee_idx = df.columns.get_loc("PBS_Capturee")
+                for row_idx in range(len(df)):
+                    date_val = df.at[row_idx, "PBS_Capture_Date"]
+                    if pd.isna(date_val) or date_val == "":
+                        worksheet.conditional_format(row_idx+1, date_idx, row_idx+1, date_idx, {'type':'no_errors','format':alert_format})
+                        worksheet.conditional_format(row_idx+1, capturee_idx, row_idx+1, capturee_idx, {'type':'no_errors','format':alert_format})
+                        # Add comment for capturee
+                        name = df.at[row_idx, "Surname"] if "Surname" in df.columns else ""
+                        worksheet.write_comment(row_idx+1, capturee_idx,
+                                                f"{name} needs to be captured for biometrics",
+                                                {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
+
+            # Mask highlighting
             if sheet_name in row_masks:
                 mask = row_masks[sheet_name]
-                highlight_format = workbook.add_format({'bg_color': '#FFEB9C'})
-                for row_idx, flag in enumerate(mask, start=1):
+                for row_idx, flag in enumerate(mask):
                     if flag:
-                        worksheet.conditional_format(row_idx, first_col, row_idx, last_col,
-                                                    {'type': 'formula',
-                                                    'criteria': '=TRUE',
-                                                    'format': highlight_format})
-            
+                        worksheet.conditional_format(row_idx+1, first_col, row_idx+1, last_col,
+                                                    {'type': 'formula', 'criteria': '=TRUE', 'format': mask_format})
+
             # Row banding
-            row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
-            worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1,
-                                         {'type': 'formula', 'criteria': 'MOD(ROW(), 2) = 0', 'format': row_band_format})
+            worksheet.conditional_format(1, 0, len(df), len(df.columns)-1,
+                                         {'type': 'formula', 'criteria': 'MOD(ROW(),2)=0', 'format': row_band_format})
 
-            # Set column widths
-            column_ranges = {
-                'O:AF': 10, 'J:M': 12, 'N:N': 40, 'E:F': 15
-            }
-            for col_range, width in column_ranges.items():
+            # Column widths
+            col_ranges = {'O:AF':10, 'J:M':12, 'N:N':40, 'E:F':15}
+            for col_range, width in col_ranges.items():
                 worksheet.set_column(col_range, width)
-
             worksheet.set_column('G:G', None, None, {'hidden': True})
 
-    # Save the workbook
+    # ----------------------------
+    # Save workbook
+    # ----------------------------
     writer.close()
     output.seek(0)
-    
-    # Resolve absolute path to outputs folder
+
     output_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
     os.makedirs(output_dir, exist_ok=True)
-    
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{summaryName}_{timestamp}.xlsx"
     output_path = os.path.join(output_dir, filename)
-
     with open(output_path, "wb") as f:
         f.write(output.getbuffer())
 
