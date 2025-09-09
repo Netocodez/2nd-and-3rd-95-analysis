@@ -6,8 +6,8 @@ from datetime import datetime
 emr_df = pd.read_csv("LAMISNMRS.csv", encoding='utf-8')
 
 #Filter and process line list        
-columns_to_select = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated", "CaseManager"]
-columns_to_select2 = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]
+columns_to_select = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated", "CaseManager"]
+columns_to_select2 = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]
 
 #function to process line list
 def process_Linelist(df, column_name, filter_value, columns_to_select, sort_by=None, ascending=True):
@@ -140,7 +140,41 @@ def ensureLGAState(df, emr_df):
     
     return df
 
-def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY", division_columns=None, color_column="%Weekly Refill Rate", column_widths=None, mergeNum=2):
+def sc_gap_mask(
+        df: pd.DataFrame,
+        end_date: str | pd.Timestamp,
+        last_sample_col: str = "LastDateOfSampleCollection",
+        art_start_col: str = "ARTStartDate"
+    ) -> pd.Series:
+
+    today = pd.to_datetime(end_date)
+    end_of_quarter = today + pd.tseries.offsets.QuarterEnd(0)
+    one_year_ago_quarter_end = (today - pd.DateOffset(years=1)) + pd.tseries.offsets.QuarterEnd(0)
+
+    art_start = pd.to_datetime(df[art_start_col], errors="coerce", dayfirst=True)
+    sample_date = pd.to_datetime(df[last_sample_col], errors="coerce", dayfirst=True)
+    
+    # months on ART as at end_of_quarter
+    months_on_art = (
+        (end_of_quarter.year - art_start.dt.year) * 12 +
+        (end_of_quarter.month - art_start.dt.month) -
+        (art_start.dt.day > end_of_quarter.day)
+    )
+
+    mask = (
+        (df['CurrentARTStatus'] == 'Active') &
+        (df['ARTStatus_PreviousQuarter'] == 'Active') &
+        (months_on_art >= 6) &
+        ((sample_date.isna()) | (sample_date <= one_year_ago_quarter_end))  # blank/NaT sample date or older than 1 year
+    )
+
+    return mask
+
+def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY", division_columns=None, color_column="%Weekly Refill Rate", column_widths=None, mergeNum=2, row_masks=None):
+    
+    if row_masks is None:
+        row_masks = {}
+    
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine="xlsxwriter")
     
@@ -251,6 +285,21 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                     )
 
         elif sheet_name != summaryName:
+            
+            first_col = 0
+            last_col = len(dataframe.columns) - 1
+            
+             # --- Mask highlighting (applied AFTER banding for priority) ---
+            if sheet_name in row_masks:
+                mask = row_masks[sheet_name]
+                highlight_format = workbook.add_format({'bg_color': '#FFEB9C'})
+                for row_idx, flag in enumerate(mask, start=1):
+                    if flag:
+                        worksheet.conditional_format(row_idx, first_col, row_idx, last_col,
+                                                    {'type': 'formula',
+                                                    'criteria': '=TRUE',
+                                                    'format': highlight_format})
+            
             # Row banding
             row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
             worksheet.conditional_format(1, 0, len(dataframe), len(dataframe.columns) - 1,

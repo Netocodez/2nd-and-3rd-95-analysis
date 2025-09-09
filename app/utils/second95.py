@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask
 from .utils_2nd95 import (
     compute_appointment_and_iit_dates,
     classify_iit_Appt_status,
@@ -56,8 +56,8 @@ def second95(df, endDate):
     result   
     
     #format and export
-    formatted_period = endDate.strftime("%d-%m-%Y")
-
+    formatted_period = endDate.strftime("%d-%m-%Y")    
+    
     # List of dataframes and their corresponding sheet names
     dataframes = {
         "CURRENT FY IIT": dfCurrentYearIIT,
@@ -69,6 +69,16 @@ def second95(df, endDate):
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
+    
+    #mask = sc_gap_mask(dfcurrentmonthexpected, endDate)
+    
+    # Build row_masks for all sheets except the summary
+    row_masks_dict = {}
+    for sheet_name, df in dataframes.items():
+        if sheet_name != "2ND 95 SUMMARY":
+            # Compute mask for this dataframe
+            # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -78,7 +88,8 @@ def second95(df, endDate):
         division_columns=None,
         color_column=["%Weekly Refill Rate"],
         column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1 #merge first three columns for the summary total row
+        mergeNum=1, #merge first three columns for the summary total row
+        row_masks=row_masks_dict  # << pass mask here
     )
     return filename
 
@@ -142,6 +153,14 @@ def second95CMG(df, endDate):
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
+    
+    # Build row_masks for all sheets except the summary
+    row_masks_dict = {}
+    for sheet_name, df in dataframes.items():
+        if sheet_name != "2ND 95 SUMMARY":
+            # Compute mask for this dataframe
+            # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -151,7 +170,8 @@ def second95CMG(df, endDate):
         division_columns=None,
         color_column=["%Weekly Refill Rate"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2 #merge first three columns for the summary total row
+        mergeNum=2, #merge first three columns for the summary total row
+        row_masks=row_masks_dict  # << pass mask here
     )
     return filename
 
@@ -223,6 +243,14 @@ def Second95R(df, dfbaseline, endDate):
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
+    
+    # Build row_masks for all sheets except the summary
+    row_masks_dict = {}
+    for sheet_name, df in dataframes.items():
+        if sheet_name != "2ND 95 SUMMARY":
+            # Compute mask for this dataframe
+            # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -232,7 +260,8 @@ def Second95R(df, dfbaseline, endDate):
         division_columns={"G": ("F", "E")},
         color_column=["%Weekly Refill Rate"],
         column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1 #merge first three columns for the summary total row
+        mergeNum=1, #merge first three columns for the summary total row
+        row_masks=row_masks_dict  # << pass mask here
     )
     return filename  
 
@@ -309,6 +338,14 @@ def Second95RCMG(df, dfbaseline, endDate):
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
+    
+    # Build row_masks for all sheets except the summary
+    row_masks_dict = {}
+    for sheet_name, df in dataframes.items():
+        if sheet_name != "2ND 95 SUMMARY":
+            # Compute mask for this dataframe
+            # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -318,6 +355,7 @@ def Second95RCMG(df, dfbaseline, endDate):
         division_columns={"H": ("G", "F")},
         color_column=["%Weekly Refill Rate"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2 #merge first three columns for the summary total row
+        mergeNum=2, #merge first three columns for the summary total row
+        row_masks=row_masks_dict  # << pass mask here
     )
     return filename
