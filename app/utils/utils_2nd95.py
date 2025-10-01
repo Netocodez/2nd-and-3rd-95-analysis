@@ -128,6 +128,47 @@ def classify_iit_Appt_status(df, endDate):
     return df
 
 
+def trackBiometrics(df, endDate):
+    # Convert endDate to datetime
+    today = pd.to_datetime(endDate)
+    current_year = today.year
+    current_week = today.isocalendar().week
+
+    # Ensure datetime formats for relevant columns
+    df['NextAppt'] = pd.to_datetime(df['NextAppt'], errors='coerce')
+    #df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce', dayfirst=True)
+    df['LastDateOfSampleCollection2'] = pd.to_datetime(df['LastDateOfSampleCollection'], errors='coerce', dayfirst=True).fillna('1900-01-01')
+
+
+    # === Captured Biometrics ===
+    mask_captured = (df['PBS_Capturee'] == "Yes") & (df['CurrentARTStatus'] == 'Active')
+    df['CapturedBiometrics'] = np.where(mask_captured, 'CapturedBiometrics', 'notCapturedBiometrics')
+
+    # === Biometrics gap ===
+    mask_gap = (df['PBS_Capturee'] == "No") & (df['CurrentARTStatus'] == 'Active')
+    df['BiometricsGap'] = np.where(mask_gap, 'BiometricsGap', 'notBiometricsGap')
+
+    # === Weekly Missed Biometrics ===
+    mask_weekly = (
+        (df['PBS_Capturee'] == "No") &
+        (df['CurrentARTStatus'] == 'Active') &
+        (
+            # Either pharmacy refill OR sample collection happened in current week/year
+            ((df['Pharmacy_LastPickupdate2'].notna()) &
+            (df['Pharmacy_LastPickupdate2'].dt.isocalendar().week == current_week) &
+            (df['Pharmacy_LastPickupdate2'].dt.year == current_year)) |
+            ((df['LastDateOfSampleCollection2'].notna()) &
+            (df['LastDateOfSampleCollection2'].dt.isocalendar().week == current_week) &
+            (df['LastDateOfSampleCollection2'].dt.year == current_year))
+        )
+    )
+
+    df['WKMissedBiometrics'] = np.where(mask_weekly, 'WKMissedBiometrics', 'notWKMissedBiometrics')
+
+
+    return df 
+
+
 def integrate_baseline_data(df, dfbaseline):
     
     #Bring in Values from baseline ART line list

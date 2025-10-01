@@ -7,6 +7,7 @@ from .emr_processor import process_Linelist, columns_to_select, columns_to_selec
 from .utils_2nd95 import (
     compute_appointment_and_iit_dates,
     classify_iit_Appt_status,
+    trackBiometrics,
     integrate_baseline_data
 )
 
@@ -16,6 +17,7 @@ def second95(df, endDate):
     
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
+    df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
     
@@ -26,6 +28,8 @@ def second95(df, endDate):
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
     dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2)
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2)
         
     df2nd95Summary = df
 
@@ -38,10 +42,17 @@ def second95(df, endDate):
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
     df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
     df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
+    df2nd95Summary['CapturedBiometrics'] = df2nd95Summary['CapturedBiometrics'].apply(lambda x: 1 if x == "CapturedBiometrics" else 0)
+    df2nd95Summary['BiometricsGap'] = df2nd95Summary['BiometricsGap'].apply(lambda x: 1 if x == "BiometricsGap" else 0)
+    df2nd95Summary['WKMissedBiometrics'] = df2nd95Summary['WKMissedBiometrics'].apply(lambda x: 1 if x == "WKMissedBiometrics" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
+    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']
     result = result[(result[result_check] != 0).any(axis=1)]
+    
+    result['%Biometrics Coverage'] = ((result['CapturedBiometrics'] / result['ActiveClients'])).round(4)
+    result = result[['LGA','FacilityName','ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','%Biometrics Coverage','BiometricsGap','WKMissedBiometrics']]
+
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -52,7 +63,11 @@ def second95(df, endDate):
                                     'CurrentWeekIIT': 'Curr Week IIT',
                                     'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
                                     'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
-                                    'currentmonthexpected': 'EXPECTED THIS MONTH',})
+                                    'currentmonthexpected': 'EXPECTED THIS MONTH',
+                                    'CapturedBiometrics': 'Captured Biometrics',
+                                    'BiometricsGap': 'Biometrics Gap',
+                                    'WKMissedBiometrics': 'Weekly Missed Biometrics',})
+    
     result   
     
     #format and export
@@ -66,6 +81,8 @@ def second95(df, endDate):
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "CURRENT FY LOSSES": dfCurrentYearLosses,
+        "BIOMETRICS GAP": dfBiometricsGap,
+        "WEEKLY MISSED BIOMETRICS": dfWKMissedBiometrics,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -85,8 +102,8 @@ def second95(df, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns=None,
-        color_column=["%Weekly Refill Rate"],
+        division_columns={'M': ('L', 'C')},
+        color_column=["%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
         mergeNum=1, #merge first three columns for the summary total row
         row_masks=row_masks_dict  # << pass mask here
@@ -103,6 +120,7 @@ def second95CMG(df, endDate):
         
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
+    df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
@@ -110,6 +128,8 @@ def second95CMG(df, endDate):
     dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
     dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by='CaseManager')
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by='CaseManager')
     
     df2nd95Summary = df
 
@@ -122,10 +142,17 @@ def second95CMG(df, endDate):
     df2nd95Summary['currentmonthexpected'] = df2nd95Summary['currentmonthexpected'].apply(lambda x: 1 if x == "currentmonthexpected" else 0)
     df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
     df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
+    df2nd95Summary['CapturedBiometrics'] = df2nd95Summary['CapturedBiometrics'].apply(lambda x: 1 if x == "CapturedBiometrics" else 0)
+    df2nd95Summary['BiometricsGap'] = df2nd95Summary['BiometricsGap'].apply(lambda x: 1 if x == "BiometricsGap" else 0)
+    df2nd95Summary['WKMissedBiometrics'] = df2nd95Summary['WKMissedBiometrics'].apply(lambda x: 1 if x == "WKMissedBiometrics" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
+    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']
     result = result[(result[result_check] != 0).any(axis=1)]
+    
+    result['%Biometrics Coverage'] = ((result['CapturedBiometrics'] / result['ActiveClients'])).round(4)
+    result = result[['LGA','FacilityName','CaseManager','ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','%Biometrics Coverage','BiometricsGap','WKMissedBiometrics']]
+
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -136,7 +163,10 @@ def second95CMG(df, endDate):
                                     'CurrentWeekIIT': 'Curr Week IIT',
                                     'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
                                     'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
-                                    'currentmonthexpected': 'EXPECTED THIS MONTH',})
+                                    'currentmonthexpected': 'EXPECTED THIS MONTH',
+                                    'CapturedBiometrics': 'Captured Biometrics',
+                                    'BiometricsGap': 'Biometrics Gap',
+                                    'WKMissedBiometrics': 'Weekly Missed Biometrics',})
     result   
     
     #format and export
@@ -150,6 +180,8 @@ def second95CMG(df, endDate):
         "NEXT 7 DAYS IIT": dfsevendaysIIT,
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "CURRENT FY LOSSES": dfCurrentYearLosses,
+        "BIOMETRICS GAP": dfBiometricsGap,
+        "WEEKLY MISSED BIOMETRICS": dfWKMissedBiometrics,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -167,8 +199,8 @@ def second95CMG(df, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns=None,
-        color_column=["%Weekly Refill Rate"],
+        division_columns={'N': ('M', 'D')},
+        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
         mergeNum=2, #merge first three columns for the summary total row
         row_masks=row_masks_dict  # << pass mask here
@@ -183,6 +215,7 @@ def Second95R(df, dfbaseline, endDate):
     df = integrate_baseline_data(df, dfbaseline)
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
+    df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
@@ -191,6 +224,8 @@ def Second95R(df, dfbaseline, endDate):
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
     dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select2)
     dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2)
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2)
     
     df2nd95Summary = df
 
@@ -205,13 +240,17 @@ def Second95R(df, dfbaseline, endDate):
     df2nd95Summary['weeklyexpectedrefilled'] = df2nd95Summary['weeklyexpectedrefilled'].apply(lambda x: 1 if x == "weeklyexpectedrefilled" else 0)
     df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
     df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
+    df2nd95Summary['CapturedBiometrics'] = df2nd95Summary['CapturedBiometrics'].apply(lambda x: 1 if x == "CapturedBiometrics" else 0)
+    df2nd95Summary['BiometricsGap'] = df2nd95Summary['BiometricsGap'].apply(lambda x: 1 if x == "BiometricsGap" else 0)
+    df2nd95Summary['WKMissedBiometrics'] = df2nd95Summary['WKMissedBiometrics'].apply(lambda x: 1 if x == "WKMissedBiometrics" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
+    result = df2nd95Summary.groupby(['LGA','FacilityName'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']
     result = result[(result[result_check] != 0).any(axis=1)]
     
+    result['%Biometrics Coverage'] = ((result['CapturedBiometrics'] / result['ActiveClients'])).round(4)
     result['Weekly_Refill_Rate'] = ((result['weeklyexpectedrefilled'] / result['currentweekexpected'])).round(4)
-    result = result[['LGA','FacilityName','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']]
+    result = result[['LGA','FacilityName','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','%Biometrics Coverage','BiometricsGap','WKMissedBiometrics']]
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -225,7 +264,10 @@ def Second95R(df, dfbaseline, endDate):
                                     'CurrentWeekIIT': 'Curr Week IIT',
                                     'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
                                     'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
-                                    'Weekly_Refill_Rate': '%Weekly Refill Rate',})
+                                    'Weekly_Refill_Rate': '%Weekly Refill Rate',
+                                    'CapturedBiometrics': 'Captured Biometrics',
+                                    'BiometricsGap': 'Biometrics Gap',
+                                    'WKMissedBiometrics': 'Weekly Missed Biometrics',})
     result   
     
     #format and export
@@ -240,6 +282,8 @@ def Second95R(df, dfbaseline, endDate):
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "EXPECTED THIS WEEK": dfpendingweeklyrefill,
         "CURRENT FY LOSSES": dfCurrentYearLosses,
+        "BIOMETRICS GAP": dfBiometricsGap,
+        "WEEKLY MISSED BIOMETRICS": dfWKMissedBiometrics,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -257,8 +301,8 @@ def Second95R(df, dfbaseline, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={"G": ("F", "E")},
-        color_column=["%Weekly Refill Rate"],
+        division_columns={"G": ("F", "E"), 'P': ('O', 'C')},
+        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
         mergeNum=1, #merge first three columns for the summary total row
         row_masks=row_masks_dict  # << pass mask here
@@ -277,6 +321,7 @@ def Second95RCMG(df, dfbaseline, endDate):
     df = integrate_baseline_data(df, dfbaseline)
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
+    df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #apply function to process line list
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
@@ -286,6 +331,8 @@ def Second95RCMG(df, dfbaseline, endDate):
     dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
     dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select, sort_by='CaseManager') 
     dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by='CaseManager')
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by='CaseManager')
     
     df2nd95Summary = df
 
@@ -300,13 +347,17 @@ def Second95RCMG(df, dfbaseline, endDate):
     df2nd95Summary['weeklyexpectedrefilled'] = df2nd95Summary['weeklyexpectedrefilled'].apply(lambda x: 1 if x == "weeklyexpectedrefilled" else 0)
     df2nd95Summary['CurrentWeekLosses'] = df2nd95Summary['CurrentWeekLosses'].apply(lambda x: 1 if x == "CurrentWeekLosses" else 0)
     df2nd95Summary['CurrentYearLosses'] = df2nd95Summary['CurrentYearLosses'].apply(lambda x: 1 if x == "CurrentYearLosses" else 0)
+    df2nd95Summary['CapturedBiometrics'] = df2nd95Summary['CapturedBiometrics'].apply(lambda x: 1 if x == "CapturedBiometrics" else 0)
+    df2nd95Summary['BiometricsGap'] = df2nd95Summary['BiometricsGap'].apply(lambda x: 1 if x == "BiometricsGap" else 0)
+    df2nd95Summary['WKMissedBiometrics'] = df2nd95Summary['WKMissedBiometrics'].apply(lambda x: 1 if x == "WKMissedBiometrics" else 0)
 
-    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']].sum().reset_index()
-    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']
+    result = df2nd95Summary.groupby(['LGA','FacilityName','CaseManager'])[['ActiveClients', 'currentYearIIT', 'previousyearIIT','ImminentIIT','sevendaysIIT','currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']].sum().reset_index()
+    result_check = ['ActiveClients', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'currentmonthexpected', 'currentweekexpected', 'weeklyexpectedrefilled', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','BiometricsGap','WKMissedBiometrics']
     result = result[(result[result_check] != 0).any(axis=1)]
     
+    result['%Biometrics Coverage'] = ((result['CapturedBiometrics'] / result['ActiveClients'])).round(4)    
     result['Weekly_Refill_Rate'] = ((result['weeklyexpectedrefilled'] / result['currentweekexpected'])).round(4)
-    result = result[['LGA','FacilityName','CaseManager','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses']]
+    result = result[['LGA','FacilityName','CaseManager','ActiveClients','currentmonthexpected','currentweekexpected','weeklyexpectedrefilled','Weekly_Refill_Rate', 'currentYearIIT', 'previousyearIIT', 'ImminentIIT', 'sevendaysIIT', 'CurrentWeekIIT', 'CurrentWeekLosses', 'CurrentYearLosses', 'CapturedBiometrics','%Biometrics Coverage','BiometricsGap','WKMissedBiometrics']]
 
 
     result = result.rename(columns={'ActiveClients': 'Active Clients',
@@ -320,7 +371,10 @@ def Second95RCMG(df, dfbaseline, endDate):
                                     'CurrentWeekIIT': 'Curr Week IIT',
                                     'CurrentWeekLosses': 'Curr WK Losses (Stp, Dead, TO)',
                                     'CurrentYearLosses': 'Curr FY Losses (Stp, Dead, TO)',
-                                    'Weekly_Refill_Rate': '%Weekly Refill Rate',})
+                                    'Weekly_Refill_Rate': '%Weekly Refill Rate',
+                                    'CapturedBiometrics': 'Captured Biometrics',
+                                    'BiometricsGap': 'Biometrics Gap',
+                                    'WKMissedBiometrics': 'Weekly Missed Biometrics',})
     result   
     
     #format and export
@@ -335,6 +389,8 @@ def Second95RCMG(df, dfbaseline, endDate):
         "EXPECTED THIS MONTH": dfcurrentmonthexpected,
         "EXPECTED THIS WEEK": dfpendingweeklyrefill,
         "CURRENT FY LOSSES": dfCurrentYearLosses,
+        "BIOMETRICS GAP": dfBiometricsGap,
+        "WEEKLY MISSED BIOMETRICS": dfWKMissedBiometrics,
         "2ND 95 SUMMARY": result,
         # Add more dataframes and sheet names as needed
     }
@@ -352,8 +408,8 @@ def Second95RCMG(df, dfbaseline, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={"H": ("G", "F")},
-        color_column=["%Weekly Refill Rate"],
+        division_columns={"H": ("G", "F"), 'Q': ('P', 'D')},
+        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
         mergeNum=2, #merge first three columns for the summary total row
         row_masks=row_masks_dict  # << pass mask here
