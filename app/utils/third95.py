@@ -48,15 +48,21 @@ def third95(df, end_date):
         if ref_date is None:
             today = pd.Timestamp.today().normalize()  # current day
         else:
-            today = pd.to_datetime(ref_date) + pd.offsets.MonthEnd(0)  # last day of month for given date
+            today = pd.to_datetime(ref_date) # use provided reference date
 
         # fully vectorized age calculation
         dob = df[dob_col]
+        dob = dob.astype(str).str.strip()
+        dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
         age = (today.year - dob.dt.year 
             - ((dob.dt.month > today.month) | 
                 ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
 
         return age
+    
+    #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
+    df['DOB'] = df['DOB'].astype(str).str.strip()
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
     df['Age'] = calculate_age_vectorized(df, 'DOB', ref_date=end_date)
 
@@ -92,9 +98,9 @@ def third95(df, end_date):
 
     #3rd 95 columns integration
     #df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
-    df['validVlResult'] = df.apply(lambda row: 'Valid Result' if ((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['DateResultReceivedFacility'] > end_of_quarter_last_6_months)) else 'Invalid Result', axis=1)
+    df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['DateResultReceivedFacility'] > six_months_ago)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago))) else 'Invalid Result', axis=1)
     #df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
-    df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > end_of_quarter_last_6_months)) else 'Invalid SC', axis=1)
+    df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago)) else 'Invalid SC', axis=1)
     df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
     df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek) and row['eligible_today']) else 'NotvlWKMissedSC', axis=1)
     df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)  
@@ -361,10 +367,37 @@ def third95CMG(df, end_date):
         today = pd.to_datetime(endDate)
         last_30_days = today - pd.Timedelta(days=29)
         next_30_days = today + pd.Timedelta(days=29)
+        
+        #function to calculate current age and mirror excel datedif function
+        def calculate_age_vectorized(df, dob_col='DOB', ref_date=None):
+            # pick the reference date
+            if ref_date is None:
+                today = pd.Timestamp.today().normalize()  # current day
+            else:
+                today = pd.to_datetime(ref_date) # use provided reference date
+
+            # fully vectorized age calculation
+            dob = df[dob_col]
+            dob = dob.astype(str).str.strip()
+            dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+            age = (today.year - dob.dt.year 
+                - ((dob.dt.month > today.month) | 
+                    ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
+
+            return age
+        
+        #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
+        df['DOB'] = df['DOB'].astype(str).str.strip()
+        df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+        
+        df['Age'] = calculate_age_vectorized(df, 'DOB', ref_date=end_date)
 
         # Get the last day of the first quarter in the last one year
         last_year = today - pd.DateOffset(years=1)
         first_quarter_last_year = pd.to_datetime(last_year) + pd.tseries.offsets.QuarterEnd(0)
+        
+        six_months_ago = today - pd.DateOffset(months=6)
+        end_of_quarter_last_6_months = pd.to_datetime(six_months_ago) + pd.tseries.offsets.QuarterEnd(0)
 
         print(first_quarter_last_year)     
         
@@ -375,9 +408,10 @@ def third95CMG(df, end_date):
         df['NextAppt'] = pd.to_datetime(df['NextAppt'])
 
         #3rd 95 columns integration
-        #df['validVlResult'] = df.apply(lambda row: 'Valid Result' if row['DateResultReceivedFacility'] > first_quarter_last_year else 'Invalid Result', axis=1)
-        df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
-        df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
+        df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['DateResultReceivedFacility'] > six_months_ago)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago))) else 'Invalid Result', axis=1)
+        df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago)) else 'Invalid SC', axis=1)
+        #df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
+        #df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
         df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
         df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek) and row['eligible_today']) else 'NotvlWKMissedSC', axis=1)
         df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)    

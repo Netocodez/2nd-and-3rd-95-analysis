@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized
 from .utils_2nd95 import (
     compute_appointment_and_iit_dates,
     classify_iit_Appt_status,
@@ -20,6 +20,10 @@ def second95(df, endDate):
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
+    df['DOB'] = df['DOB'].astype(str).str.strip()
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    
+    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     
     #Generate line lists
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
@@ -95,7 +99,7 @@ def second95(df, endDate):
         if sheet_name != "2ND 95 SUMMARY":
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -121,6 +125,12 @@ def second95CMG(df, endDate):
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
+    
+    #df.to_excel('temp.xlsx', index=False)
+    df['DOB'] = df['DOB'].astype(str).str.strip()
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    
+    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
@@ -192,7 +202,7 @@ def second95CMG(df, endDate):
         if sheet_name != "2ND 95 SUMMARY":
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -216,6 +226,12 @@ def Second95R(df, dfbaseline, endDate):
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
+    
+    #df.to_excel('temp.xlsx', index=False)
+    df['DOB'] = df['DOB'].astype(str).str.strip()
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    
+    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
@@ -294,7 +310,7 @@ def Second95R(df, dfbaseline, endDate):
         if sheet_name != "2ND 95 SUMMARY":
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -322,6 +338,12 @@ def Second95RCMG(df, dfbaseline, endDate):
     df = compute_appointment_and_iit_dates(df)
     df = classify_iit_Appt_status(df, endDate) #adding relevant columns for IIT and appointment status
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
+    
+    #df.to_excel('temp.xlsx', index=False)
+    df['DOB'] = df['DOB'].astype(str).str.strip()
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    
+    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     
     #apply function to process line list
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
@@ -401,7 +423,7 @@ def Second95RCMG(df, dfbaseline, endDate):
         if sheet_name != "2ND 95 SUMMARY":
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate)
+            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(

@@ -3,7 +3,7 @@ import pandas as pd
 
 ALLOWED_EXTENSIONS = {'.xlsx', '.xls', '.csv'}
 
-DATE_COLUMNS = ['DOB', 'ARTStartDate', 'Pharmacy_LastPickupdate', 'DateResultReceivedFacility', 'LastDateOfSampleCollection',
+DATE_COLUMNS = ['ARTStartDate', 'Pharmacy_LastPickupdate', 'DateResultReceivedFacility', 'LastDateOfSampleCollection',
                 'Date_Transfered_In', 'Outcomes_Date', 'DateofCurrent_TBStatus', 'First_TPT_Pickupdate', 'DateConfirmedHIV+', 'IIT_Date', 'PBS_Capture_Date']
 NUMERIC_COLUMNS = ['DaysOfARVRefill', 'CurrentViralLoad']
 

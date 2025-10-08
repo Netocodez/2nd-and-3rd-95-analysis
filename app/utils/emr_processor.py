@@ -140,16 +140,35 @@ def ensureLGAState(df, emr_df):
     
     return df
 
+def calculate_age_vectorized(df, dob_col='DOB', ref_date=None):
+        # pick the reference date
+        if ref_date is None:
+            today = pd.Timestamp.today().normalize()  # current day
+        else:
+            today = pd.to_datetime(ref_date) # use provided reference date
+
+        # fully vectorized age calculation
+        dob = df[dob_col]
+        dob = dob.astype(str).str.strip()
+        dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+        age = (today.year - dob.dt.year 
+            - ((dob.dt.month > today.month) | 
+                ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
+
+        return age
+
 def sc_gap_mask(
         df: pd.DataFrame,
         end_date: str | pd.Timestamp,
         last_sample_col: str = "LastDateOfSampleCollection",
-        art_start_col: str = "ARTStartDate"
+        art_start_col: str = "ARTStartDate",
+        age_col: str = "Age"
     ) -> pd.Series:
 
     today = pd.to_datetime(end_date)
     end_of_quarter = today + pd.tseries.offsets.QuarterEnd(0)
     one_year_ago_quarter_end = (today - pd.DateOffset(years=1)) + pd.tseries.offsets.QuarterEnd(0)
+    six_months_ago = today - pd.DateOffset(months=6)
 
     art_start = pd.to_datetime(df[art_start_col], errors="coerce", dayfirst=True)
     sample_date = pd.to_datetime(df[last_sample_col], errors="coerce", dayfirst=True)
@@ -161,11 +180,17 @@ def sc_gap_mask(
         (art_start.dt.day > end_of_quarter.day)
     )
 
+    # Adults: no sample or last sample > 12 months ago
+    adult_mask = (df[age_col] >= 15) & ((sample_date.isna()) | (sample_date <= one_year_ago_quarter_end))
+
+    # Pediatrics: no sample or last sample > 6 months ago
+    ped_mask = (df[age_col] < 15) & ((sample_date.isna()) | (sample_date <= six_months_ago))
+
     mask = (
         (df['CurrentARTStatus'] == 'Active') &
         (df['ARTStatus_PreviousQuarter'] == 'Active') &
         (months_on_art >= 6) &
-        ((sample_date.isna()) | (sample_date <= one_year_ago_quarter_end))  # blank/NaT sample date or older than 1 year
+        (adult_mask | ped_mask)
     )
 
     return mask
