@@ -32,10 +32,15 @@ def third95(df, end_date):
 
     today = pd.to_datetime(endDate)
     endOfThisQuarter = pd.to_datetime(today) + pd.tseries.offsets.QuarterEnd(0)
-    logging.info(f"End of Current Quarter: {endOfThisQuarter}")    
+    logging.info(f"End of Current Quarter: {endOfThisQuarter}")  
+    # End of the previous quarter
+    prev_q_end = (today - pd.offsets.QuarterEnd(1)).normalize()  
     
-    df['end_date'] = endOfThisQuarter
+    df['end_date2'] = endOfThisQuarter
+    df['end_date'] = prev_q_end
     df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
+    df['LastDateOfSampleCollection2'] = pd.to_datetime(df['LastDateOfSampleCollection'].fillna('1900'))
+    df['DateResultReceivedFacility2'] = pd.to_datetime(df['DateResultReceivedFacility'].fillna('1900'))
     #df['Pharmacy_LastPickupdate2'] = pd.to_datetime(df['Pharmacy_LastPickupdate'], errors='coerce')
 
     # Function to calculate difference in months
@@ -68,6 +73,8 @@ def third95(df, end_date):
 
     # Apply the function to the DataFrame
     df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
+    df['durationOfSC'] = df.apply(lambda row: date_diff_in_months2(row['LastDateOfSampleCollection2'], row['end_date2']), axis=1)
+    df['durationOfVlResult'] = df.apply(lambda row: date_diff_in_months2(row['DateResultReceivedFacility2'], row['end_date2']), axis=1)
     
     # Flag those who are already ≥ 6 months as at today
     df['eligible_today'] = df['ARTStartDate2'].apply(lambda d: date_diff_in_months2(d, today) >= 6)
@@ -98,9 +105,9 @@ def third95(df, end_date):
 
     #3rd 95 columns integration
     #df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
-    df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['DateResultReceivedFacility'] > six_months_ago)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago))) else 'Invalid Result', axis=1)
+    df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfVlResult'] <= 6)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfSC'] <= 6))) else 'Invalid Result', axis=1)
     #df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
-    df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago)) else 'Invalid SC', axis=1)
+    df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfSC'] <= 6)) else 'Invalid SC', axis=1)
     df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
     df['vlWKMissedSC'] = df.apply(lambda row: 'vlWKMissedSC' if ((row['vlSCGap'] == 'SC Gap') and (row['Pharmacy_LastPickupdate2'].isocalendar().week == currentWeek) and row['eligible_today']) else 'NotvlWKMissedSC', axis=1)
     df['PendingResult'] = df.apply(lambda row: 'Pending' if ((row['validVlSampleCollection'] == 'Valid SC') & (row['validVlResult'] == 'Invalid Result')) else 'Not pending', axis=1)  
@@ -344,9 +351,16 @@ def third95CMG(df, end_date):
         
         endOfThisQuarter = pd.to_datetime(today) + pd.tseries.offsets.QuarterEnd(0)
         logging.info(f"End of Current Quarter: {endOfThisQuarter}")    
+        # End of the previous quarter
+        prev_q_end = (today - pd.offsets.QuarterEnd(1)).normalize()  
+        print(f"previous quarter end: {prev_q_end}")
+        logging.info(f"End of Previous Quarter: {prev_q_end}")
         
-        df['end_date'] = endOfThisQuarter
+        df['end_date2'] = endOfThisQuarter
+        df['end_date'] = prev_q_end
         df['ARTStartDate2'] = pd.to_datetime(df['ARTStartDate'].fillna('1900'))
+        df['LastDateOfSampleCollection2'] = pd.to_datetime(df['LastDateOfSampleCollection'].fillna('1900'))
+        df['DateResultReceivedFacility2'] = pd.to_datetime(df['DateResultReceivedFacility'].fillna('1900'))
 
         # Function to calculate difference in months
         def date_diff_in_months2(date1, date2):
@@ -354,6 +368,8 @@ def third95CMG(df, end_date):
 
         # Apply the function to the DataFrame
         df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
+        df['durationOfSC'] = df.apply(lambda row: date_diff_in_months2(row['LastDateOfSampleCollection2'], row['end_date2']), axis=1)
+        df['durationOfVlResult'] = df.apply(lambda row: date_diff_in_months2(row['DateResultReceivedFacility2'], row['end_date2']), axis=1)
         
         # Flag those who are already ≥ 6 months as at today
         df['eligible_today'] = df['ARTStartDate2'].apply(lambda d: date_diff_in_months2(d, today) >= 6)
@@ -408,8 +424,8 @@ def third95CMG(df, end_date):
         df['NextAppt'] = pd.to_datetime(df['NextAppt'])
 
         #3rd 95 columns integration
-        df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['DateResultReceivedFacility'] > six_months_ago)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago))) else 'Invalid Result', axis=1)
-        df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['LastDateOfSampleCollection'] > six_months_ago)) else 'Invalid SC', axis=1)
+        df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (((row['Age'] >= 15 and row['DateResultReceivedFacility'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfVlResult'] <= 6)) and ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfSC'] <= 6))) else 'Invalid Result', axis=1)
+        df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if ((row['Age'] >= 15 and row['LastDateOfSampleCollection'] > first_quarter_last_year) or (row['Age'] < 15 and row['durationOfSC'] <= 6)) else 'Invalid SC', axis=1)
         #df['validVlResult'] = df.apply(lambda row: 'Valid Result' if (row['DateResultReceivedFacility'] > first_quarter_last_year and row['LastDateOfSampleCollection'] > first_quarter_last_year) else 'Invalid Result', axis=1)
         #df['validVlSampleCollection'] = df.apply(lambda row: 'Valid SC' if row['LastDateOfSampleCollection'] > first_quarter_last_year else 'Invalid SC', axis=1)
         df['vlSCGap'] = df.apply(lambda row: 'SC Gap' if row['validVlSampleCollection'] == 'Invalid SC' else 'Not SC Gap', axis=1)
