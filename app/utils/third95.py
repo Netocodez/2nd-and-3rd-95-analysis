@@ -258,7 +258,7 @@ def third95(df, end_date):
             column_ranges = {
                 'A:A': 20,  # Example width for columns A to A
                 'B:B': 35,  # Example width for columns B to B
-                'C:C': 25,  # Example width for columns C to C
+                #'C:C': 25,  # Example width for columns C to C
                 # Add more column ranges and their widths as needed
             }
             for col_range, width in column_ranges.items():
@@ -267,7 +267,7 @@ def third95(df, end_date):
             # Add total row
             header_format.set_align('center')
             total_row = len(dataframe) + 2
-            worksheet.merge_range(total_row, 0, total_row, 2, 'Total', header_format)
+            worksheet.merge_range(total_row, 0, total_row, 1, 'Total', header_format)
             for col_num in range(1, len(dataframe.columns)):
                 col_letter = chr(65 + col_num)  # Convert column number to letter
                 #worksheet.write_formula(total_row, col_num, f'SUM({col_letter}2:{col_letter}{total_row})', header_format)
