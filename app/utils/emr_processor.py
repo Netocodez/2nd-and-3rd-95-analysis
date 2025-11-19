@@ -197,7 +197,7 @@ def sc_gap_mask(
 
 def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY",
                                     division_columns=None, color_column="%Weekly Refill Rate",
-                                    column_widths=None, mergeNum=2, row_masks=None):
+                                    column_widths=None, mergeNum=2, row_masks=None, column_config=None):
 
     if row_masks is None:
         row_masks = {}
@@ -237,6 +237,20 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
         alert_format = workbook.add_format({'bg_color': '#FFA500'})
         mask_format = workbook.add_format({'bg_color': '#FFEB9C'})
         title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
+        grand_total_format = workbook.add_format({
+            "bold": True, "text_wrap": True, "valign": "vcenter",
+            "fg_color": "#C6EFCE", "font_color": "#006100",
+            "border": 2, "font_size": 12
+        })
+        grand_total_percentage_format = workbook.add_format({
+            "bold": True, "valign": "vcenter",
+            "fg_color": "#C6EFCE", "font_color": "#006100",
+            "border": 2, "num_format": "0.00%", "font_size": 12
+        })
+        
+        def col_idx_to_excel(col_idx):
+            div, mod = divmod(col_idx, 26)
+            return chr(65 + mod) if div == 0 else chr(64 + div) + chr(65 + mod)
 
         # ----------------------------
         # Write headers
@@ -248,53 +262,133 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
         # Summary Sheet
         # ----------------------------
         if sheet_name == summaryName:
-            # Title
-            worksheet.merge_range(0, 0, 0, len(df.columns)-1, f'{summaryName} AS AT {formatted_period}', title_format)
-            # Rewrite headers/data starting row 2
-            df.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
+
+            cfg = column_config.get(sheet_name, {}) if column_config else {}
+
+            # --------------------------------------------
+            # 1️⃣ GET CONFIGURABLE TITLE  (NEW)
+            # --------------------------------------------
+            title_text = cfg.get(
+                "title",
+                f"2ND 95 SUMMARY AS AT {formatted_period}"  # default
+            )
+            # Replace {period} if used in title
+            title_text = title_text.replace("{period}", formatted_period)
+
+            # --------------------------------------------
+            # 2️⃣ GET CONFIGURABLE MERGE RANGE (NEW)
+            # --------------------------------------------
+            merge_start, merge_end = cfg.get("merge_columns", (0, 2))  # default A:C
+
+            # Merge title row
+            worksheet.merge_range(0, 0, 0, len(df.columns) - 1, title_text, title_format)
+
+            # Rewrite header below title
             for col_num, value in enumerate(df.columns):
                 worksheet.write(1, col_num, value, header_format)
 
-            # Color scale
-            color_columns = color_column if isinstance(color_column, (list, tuple)) else [color_column]
-            for col in color_columns:
-                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-                    idx = df.columns.get_loc(col)
-                    worksheet.conditional_format(
-                        2, idx, len(df)+1, idx,
-                        {'type': '3_color_scale', 'min_color': '#F8696B', 'mid_color': '#FFEB84', 'max_color': '#63BE7B'}
-                    )
+            df.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
 
-            # Row banding
+            numeric_cols = cfg.get("numeric_cols", [3,4,5,6,8,9,10,11,12,13,14,15,17,18])
+            print(f"Using numeric_cols for {sheet_name}: {numeric_cols}")
+
+            percent_formulas = cfg.get("percent_formulas", {
+                "%Weekly Refill Rate": "=G{subtotal_row}/F{subtotal_row}",
+                "%Biometrics Coverage": "=P{subtotal_row}/D{subtotal_row}"
+            })
+
+            # Apply 3-color scales to percentage columns
+            for col_name in percent_formulas:
+                if col_name in df.columns:
+                    col_idx = df.columns.get_loc(col_name)
+                    worksheet.set_column(col_idx, col_idx, None, percentage_format)
+                    worksheet.conditional_format(2, col_idx, len(df)+2, col_idx, {
+                        'type': '3_color_scale',
+                        'min_color': '#F8696B',
+                        'mid_color': '#FFEB84',
+                        'max_color': '#63BE7B'
+                    })
+
             worksheet.conditional_format(2, 0, len(df)+1, len(df.columns)-1,
-                                         {'type': 'formula', 'criteria': 'MOD(ROW(),2)=0', 'format': row_band_format})
+                                         {'type': 'formula','criteria':'MOD(ROW(),2)=0','format':row_band_format})
+
             worksheet.hide_gridlines(2)
 
             # Column widths
-            if column_widths:
-                for col_range, width in column_widths.items():
-                    worksheet.set_column(col_range, width)
+            col_widths = {'A:A':20,'B:B':35,'C:C':25}
+            for col_range, width in col_widths.items():
+                worksheet.set_column(col_range, width)
 
-            # Division formatting
-            if division_columns is None:
-                division_columns = {}
-            for col in division_columns.keys():
-                worksheet.set_column(f"{col}:{col}", None, percentage_format)
+            # Subtotals per facility
+            facility_col = 1
+            start_row = 2
+            current_row = start_row
+            subtotal_rows = []
 
-            # Total row
-            total_row = len(df)+2
-            header_format.set_align('center')
-            worksheet.merge_range(total_row, 0, total_row, mergeNum, 'Total', header_format)
-            for col_num in range(1, len(df.columns)):
-                col_letter = chr(65 + col_num)
-                if col_letter in division_columns:
-                    num_col, denom_col = division_columns[col_letter]
-                    worksheet.write_formula(total_row, col_num,
-                                            f"SUM({num_col}3:{num_col}{total_row})/SUM({denom_col}3:{denom_col}{total_row})",
-                                            percentage_bold)
-                else:
-                    worksheet.write_formula(total_row, col_num, f"SUM({col_letter}3:{col_letter}{total_row})", header_format)
+            while current_row <= len(df)+start_row-1:
+                facility_name = df.iloc[current_row - start_row, facility_col]
+                last_row = current_row
 
+                while last_row <= len(df)+start_row-1 and df.iloc[last_row - start_row, facility_col] == facility_name:
+                    last_row += 1
+
+                subtotal_row = last_row
+                subtotal_rows.append(subtotal_row+1)
+
+                # -----------------------------------------------------------
+                # SUBTOTAL MERGE — USE CONFIGURABLE RANGE  (NEW)
+                # -----------------------------------------------------------
+                worksheet.merge_range(
+                    subtotal_row, merge_start,
+                    subtotal_row, merge_end,
+                    f"Subtotal – {facility_name}", header_format
+                )
+
+                # Numeric subtotal formulas
+                for col in numeric_cols:
+                    col_letter = col_idx_to_excel(col)
+                    worksheet.write_formula(
+                        subtotal_row, col,
+                        f"=SUM({col_letter}{current_row+1}:{col_letter}{last_row})",
+                        header_format
+                    )
+
+                # Percentage subtotal
+                for col_name, formula in percent_formulas.items():
+                    if col_name in df.columns:
+                        col_idx = df.columns.get_loc(col_name)
+                        formula_str = formula.replace("{subtotal_row}", str(subtotal_row+1))
+                        worksheet.write_formula(subtotal_row, col_idx, formula_str, percentage_format)
+
+                current_row = subtotal_row + 1
+
+            # -----------------------------------------------------------
+            # GRAND TOTAL ROW
+            # -----------------------------------------------------------
+            grand_total_row = current_row
+
+            worksheet.merge_range(
+                grand_total_row, merge_start,
+                grand_total_row, merge_end,
+                "GRAND TOTAL",
+                grand_total_format
+            )
+
+            for col in numeric_cols:
+                col_letter = col_idx_to_excel(col)
+                subtotal_cells = ",".join([f"{col_letter}{r}" for r in subtotal_rows])
+                worksheet.write_formula(
+                    grand_total_row, col,
+                    f"=SUM({subtotal_cells})",
+                    grand_total_format
+                )
+
+            for col_name, formula in percent_formulas.items():
+                if col_name in df.columns:
+                    col_idx = df.columns.get_loc(col_name)
+                    formula_str = formula.replace("{subtotal_row}", str(grand_total_row+1))
+                    worksheet.write_formula(grand_total_row, col_idx, formula_str, grand_total_percentage_format)
+                    
         # ----------------------------
         # Non-summary Sheets
         # ----------------------------

@@ -100,6 +100,23 @@ def second95(df, endDate):
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
             row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+            
+    # Dynamic numeric and percentage column configuration
+    column_config = {
+        "2ND 95 SUMMARY": {
+            "numeric_cols": [2,3,4,5,6,7,8,9,10,11,13,14],
+
+            "percent_formulas": {
+                "%Biometrics Coverage": "=L{subtotal_row}/C{subtotal_row}"
+            },
+
+            # NEW (merge A:C)
+            "merge_columns": (0, 1),
+
+            # NEW title override
+            "title": "2ND 95 PERFORMANCE REPORT – {period}"
+        }
+    }
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -110,7 +127,8 @@ def second95(df, endDate):
         color_column=["%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
         mergeNum=1, #merge first three columns for the summary total row
-        row_masks=row_masks_dict  # << pass mask here
+        row_masks=row_masks_dict,  # << pass mask here
+        column_config=column_config
     )
     return filename
 
@@ -203,6 +221,23 @@ def second95CMG(df, endDate):
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
             row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+            
+    # Dynamic numeric and percentage column configuration
+    column_config = {
+        "2ND 95 SUMMARY": {
+            "numeric_cols": [3,4,5,6,7,8,9,10,11,12,14,15],
+
+            "percent_formulas": {
+                "%Biometrics Coverage": "=M{subtotal_row}/D{subtotal_row}"
+            },
+
+            # NEW (merge A:C)
+            "merge_columns": (0, 2),
+
+            # NEW title override
+            "title": "2ND 95 PERFORMANCE REPORT – {period}"
+        }
+    }
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -213,7 +248,8 @@ def second95CMG(df, endDate):
         color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
         mergeNum=2, #merge first three columns for the summary total row
-        row_masks=row_masks_dict  # << pass mask here
+        row_masks=row_masks_dict,  # << pass mask here
+        column_config=column_config
     )
     return filename
 
@@ -311,6 +347,24 @@ def Second95R(df, dfbaseline, endDate):
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
             row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+    
+    # Dynamic numeric and percentage column configuration
+    column_config = {
+        "2ND 95 SUMMARY": {
+            "numeric_cols": [2,3,4,5,7,8,9,10,11,12,13,14,16,17],
+
+            "percent_formulas": {
+                "%Weekly Refill Rate": "=F{subtotal_row}/E{subtotal_row}",
+                "%Biometrics Coverage": "=O{subtotal_row}/C{subtotal_row}"
+            },
+
+            # NEW (merge A:C)
+            "merge_columns": (0, 1),
+
+            # NEW title override
+            "title": "2ND 95 PERFORMANCE REPORT – {period}"
+        }
+    }
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -321,9 +375,11 @@ def Second95R(df, dfbaseline, endDate):
         color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
         mergeNum=1, #merge first three columns for the summary total row
-        row_masks=row_masks_dict  # << pass mask here
+        row_masks=row_masks_dict,  # << pass mask here
+        column_config=column_config
     )
     return filename  
+
 
 def Second95RCMG(df, dfbaseline, endDate): 
     
@@ -424,6 +480,24 @@ def Second95RCMG(df, dfbaseline, endDate):
             # Compute mask for this dataframe
             # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
             row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+    
+     # Dynamic numeric and percentage column configuration
+    column_config = {
+        "2ND 95 SUMMARY": {
+            "numeric_cols": [3,4,5,6,8,9,10,11,12,13,14,15,17,18],
+
+            "percent_formulas": {
+                "%Weekly Refill Rate": "=G{subtotal_row}/F{subtotal_row}",
+                "%Biometrics Coverage": "=P{subtotal_row}/D{subtotal_row}"
+            },
+
+            # NEW (merge A:C)
+            "merge_columns": (0, 2),
+
+            # NEW title override
+            "title": "2ND 95 PERFORMANCE REPORT – {period}"
+        }
+    }
 
     # Write each dataframe to a different sheet
     filename = export_to_excel_with_formatting(
@@ -434,6 +508,7 @@ def Second95RCMG(df, dfbaseline, endDate):
         color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
         mergeNum=2, #merge first three columns for the summary total row
-        row_masks=row_masks_dict  # << pass mask here
+        row_masks=row_masks_dict,  # << pass mask here
+        column_config=column_config
     )
     return filename
