@@ -26,14 +26,14 @@ def second95(df, endDate):
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     
     #Generate line lists
-    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)    
-    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
-    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
-    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
-    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
-    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2)
-    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2)
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])    
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2,sort_by=['LGA', 'FacilityName'])
         
     df2nd95Summary = df
 
@@ -147,14 +147,14 @@ def second95CMG(df, endDate):
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
-    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
-    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by='CaseManager')
-    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
-    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
-    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
-    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by='CaseManager')
-    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by='CaseManager')
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
     
     df2nd95Summary = df
 
@@ -263,15 +263,15 @@ def Second95R(df, dfbaseline, endDate):
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
-    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2)
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2)
-    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2)
-    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2)
-    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2)
-    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select2)
-    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2)
-    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2)
-    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2)
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select2, sort_by=['LGA', 'FacilityName'])
     
     df2nd95Summary = df
 
@@ -393,15 +393,15 @@ def Second95RCMG(df, dfbaseline, endDate):
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     
     #apply function to process line list
-    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by='CaseManager')
-    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by='CaseManager')
-    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by='CaseManager')
-    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by='CaseManager')
-    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by='CaseManager')
-    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select, sort_by='CaseManager') 
-    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by='CaseManager')
-    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by='CaseManager')
-    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by='CaseManager')
+    dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfImminentIIT = process_Linelist(df, 'ImminentIIT', 'ImminentIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfsevendaysIIT = process_Linelist(df, 'sevendaysIIT', 'sevendaysIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfcurrentmonthexpected = process_Linelist(df, 'currentmonthexpected', 'currentmonthexpected', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfpendingweeklyrefill = process_Linelist(df, 'pendingweeklyrefill', 'pendingweeklyrefill', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager']) 
+    dfCurrentYearLosses = process_Linelist(df, 'CurrentYearLosses', 'CurrentYearLosses', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfBiometricsGap = process_Linelist(df, 'BiometricsGap', 'BiometricsGap', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+    dfWKMissedBiometrics = process_Linelist(df, 'WKMissedBiometrics', 'WKMissedBiometrics', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
     
     df2nd95Summary = df
 

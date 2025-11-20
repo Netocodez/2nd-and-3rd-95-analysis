@@ -119,12 +119,12 @@ def third95(df, end_date):
     
     #df.to_excel('3rd95.xlsx')           
     
-    df_sc_Gap = process_Linelist(df, 'vlSCGap', 'SC Gap', columns_to_select2)
-    df_pending_results = process_Linelist(df, 'PendingResult', 'Pending', columns_to_select2)
-    df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select2)
-    df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select2)
-    df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select2)       
-    df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select2)        
+    df_sc_Gap = process_Linelist(df, 'vlSCGap', 'SC Gap', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    df_pending_results = process_Linelist(df, 'PendingResult', 'Pending', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select2, sort_by=['LGA', 'FacilityName'])
+    df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select2, sort_by=['LGA', 'FacilityName'])       
+    df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select2, sort_by=['LGA', 'FacilityName'])        
     
     df_active_Eligible = df[df['CurrentARTStatus']=="Active"]
 
@@ -331,12 +331,12 @@ def third95CMG(df, end_date):
         df['Suppression'] = df.apply(lambda row: 'Suppressed' if ((row['validVlResult'] == 'Valid Result') & (row['CurrentViralLoad'] < 1000)) else ('Unsuppressed' if ((row['validVlResult'] == 'Valid Result') & (row['CurrentViralLoad'] > 1000)) else 'Invalid Result'), axis=1)
         #df.to_excel("3rd95.xlsx")
         
-        df_sc_Gap = process_Linelist(df, 'vlSCGap', 'SC Gap', columns_to_select, sort_by='CaseManager')
-        df_pending_results = process_Linelist(df, 'PendingResult', 'Pending', columns_to_select, sort_by='CaseManager')
-        df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select, sort_by='CaseManager')
-        df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select, sort_by='CaseManager')
-        df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select, sort_by='CaseManager')  
-        df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select, sort_by='CaseManager')   
+        df_sc_Gap = process_Linelist(df, 'vlSCGap', 'SC Gap', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+        df_pending_results = process_Linelist(df, 'PendingResult', 'Pending', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+        df_last30daysmissedSC  = process_Linelist(df, 'last30daysmissedSC', 'Missed SC', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+        df_expNext30daysdueforSC = process_Linelist(df, 'expNext30daysdueforSC', 'due for SC', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
+        df_Suppression = process_Linelist(df, 'Suppression', 'Unsuppressed', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])  
+        df_vlWKMissedSC = process_Linelist(df, 'vlWKMissedSC', 'vlWKMissedSC', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])   
         
         df_active_Eligible = df[df['CurrentARTStatus']=="Active"]
 
