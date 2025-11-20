@@ -123,10 +123,7 @@ def second95(df, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={'M': ('L', 'C')},
-        color_column=["%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1, #merge first three columns for the summary total row
         row_masks=row_masks_dict,  # << pass mask here
         column_config=column_config
     )
@@ -244,10 +241,7 @@ def second95CMG(df, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={'N': ('M', 'D')},
-        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2, #merge first three columns for the summary total row
         row_masks=row_masks_dict,  # << pass mask here
         column_config=column_config
     )
@@ -371,10 +365,7 @@ def Second95R(df, dfbaseline, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={"G": ("F", "E"), 'P': ('O', 'C')},
-        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35,},
-        mergeNum=1, #merge first three columns for the summary total row
         row_masks=row_masks_dict,  # << pass mask here
         column_config=column_config
     )
@@ -504,10 +495,7 @@ def Second95RCMG(df, dfbaseline, endDate):
         dataframes,
         formatted_period,
         summaryName="2ND 95 SUMMARY",
-        division_columns={"H": ("G", "F"), 'Q': ('P', 'D')},
-        color_column=["%Weekly Refill Rate","%Biometrics Coverage"],
         column_widths={'A:A': 20, 'B:B': 35, 'C:C': 35,},
-        mergeNum=2, #merge first three columns for the summary total row
         row_masks=row_masks_dict,  # << pass mask here
         column_config=column_config
     )

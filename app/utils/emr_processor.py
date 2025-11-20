@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 from io import BytesIO
 from datetime import datetime
@@ -196,8 +197,7 @@ def sc_gap_mask(
     return mask
 
 def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2ND 95 SUMMARY",
-                                    division_columns=None, color_column="%Weekly Refill Rate",
-                                    column_widths=None, mergeNum=2, row_masks=None, column_config=None):
+                                    column_widths=None, row_masks=None, column_config=None):
 
     if row_masks is None:
         row_masks = {}
@@ -213,10 +213,17 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
             if pd.api.types.is_datetime64_any_dtype(df[col]):
                 df[col] = df[col].dt.date
 
+    # ---------- CLEAN NUMERICS (avoid XlsxWriter NaN/Inf error) ----------
+    for df_name, df in dataframes.items():
+        num_cols = df.select_dtypes(include=[np.number]).columns
+        if len(num_cols) > 0:
+            df[num_cols] = df[num_cols].replace([np.inf, -np.inf], np.nan).fillna(0)
+
     # ----------------------------
     # Process each sheet
     # ----------------------------
     for sheet_name, df in dataframes.items():
+        # initial write (we will rewrite content for the summary sheet later)
         df.to_excel(writer, sheet_name=sheet_name, startrow=1, header=False, index=False)
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
@@ -235,6 +242,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
         })
         row_band_format = workbook.add_format({'bg_color': '#F9F9F9'})
         alert_format = workbook.add_format({'bg_color': '#FFA500'})
+        ok_format = workbook.add_format({'bg_color': '#C6EFCE'})  # light green
         mask_format = workbook.add_format({'bg_color': '#FFEB9C'})
         title_format = workbook.add_format({'bold': True, 'font_size': 14, 'align': 'center'})
         grand_total_format = workbook.add_format({
@@ -244,7 +252,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
         })
         grand_total_percentage_format = workbook.add_format({
             "bold": True, "valign": "vcenter",
-            "fg_color": "#C6EFCE", "font_color": "#006100",
+            "fg_color": "#C6EFCE", "font_color": "#000300",
             "border": 2, "num_format": "0.00%", "font_size": 12
         })
         
@@ -253,7 +261,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
             return chr(65 + mod) if div == 0 else chr(64 + div) + chr(65 + mod)
 
         # ----------------------------
-        # Write headers
+        # Write headers (top-left cell used for title in summary)
         # ----------------------------
         for col_num, value in enumerate(df.columns):
             worksheet.write(0, col_num, value, header_format)
@@ -265,20 +273,12 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
 
             cfg = column_config.get(sheet_name, {}) if column_config else {}
 
-            # --------------------------------------------
-            # 1️⃣ GET CONFIGURABLE TITLE  (NEW)
-            # --------------------------------------------
-            title_text = cfg.get(
-                "title",
-                f"2ND 95 SUMMARY AS AT {formatted_period}"  # default
-            )
-            # Replace {period} if used in title
+            # 1️⃣ Title
+            title_text = cfg.get("title", f"2ND 95 SUMMARY AS AT {formatted_period}")
             title_text = title_text.replace("{period}", formatted_period)
 
-            # --------------------------------------------
-            # 2️⃣ GET CONFIGURABLE MERGE RANGE (NEW)
-            # --------------------------------------------
-            merge_start, merge_end = cfg.get("merge_columns", (0, 2))  # default A:C
+            # 2️⃣ Merge range for title
+            merge_start, merge_end = cfg.get("merge_columns", (0, 2))
 
             # Merge title row
             worksheet.merge_range(0, 0, 0, len(df.columns) - 1, title_text, title_format)
@@ -287,6 +287,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
             for col_num, value in enumerate(df.columns):
                 worksheet.write(1, col_num, value, header_format)
 
+            # Write dataframe starting at row 2 (we will rewrite later)
             df.to_excel(writer, sheet_name=sheet_name, startrow=2, header=False, index=False)
 
             numeric_cols = cfg.get("numeric_cols", [3,4,5,6,8,9,10,11,12,13,14,15,17,18])
@@ -297,151 +298,244 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                 "%Biometrics Coverage": "=P{subtotal_row}/D{subtotal_row}"
             })
 
-            # Apply 3-color scales to percentage columns
-            for col_name in percent_formulas:
+            #worksheet.conditional_format(2, 0, 2 + max(len(df)-1, 0), len(df.columns)-1,
+                                         #{'type': 'formula','criteria':'MOD(ROW(),2)=0','format':row_band_format})
+
+            worksheet.hide_gridlines(2)
+
+            # Column widths
+            if column_widths:
+                for col_range, width in column_widths.items():
+                    worksheet.set_column(col_range, width)
+
+            # ----------------------------
+            # Subtotals per facility (PRECOMPUTED LAYOUT + MAPPING)
+            # ----------------------------
+            facility_col = 1
+            start_row = 2  # Data starts at row 2 due to title + header
+            df_len = len(df)
+
+            # STEP 1 — Build layout with space for subtotals
+            layout = []  # will contain ("data", df_idx) or ("subtotal", facility_name, start_idx, end_idx)
+
+            i = 0
+            while i < df_len:
+                facility_name = df.iloc[i, facility_col]
+
+                block_start = i
+                block_end = i
+
+                # Find contiguous facility block
+                while block_end < df_len and df.iloc[block_end, facility_col] == facility_name:
+                    block_end += 1
+
+                # Add data rows (df index)
+                for r in range(block_start, block_end):
+                    layout.append(("data", r))
+
+                # Add a subtotal placeholder row after the block
+                layout.append(("subtotal", facility_name, block_start, block_end - 1))
+
+                i = block_end
+
+            # STEP 2 — Rewrite the sheet: write rows using layout and track mapping
+            worksheet.set_default_row(15)
+            worksheet.autofilter(1, 0, 1, len(df.columns)-1)
+
+            excel_row = start_row
+            subtotal_rows = []
+            df_to_excel_row = {}  # map df index -> actual excel row (0-based)
+
+            for item in layout:
+
+                if item[0] == "data":
+                    df_idx = item[1]
+                    row_values = df.iloc[df_idx].tolist()
+                    worksheet.write_row(excel_row, 0, row_values)
+                    # record mapping
+                    df_to_excel_row[df_idx] = excel_row
+                    excel_row += 1
+
+                else:  # subtotal row
+                    facility_name, block_start, block_end = item[1], item[2], item[3]
+                    subtotal_rows.append(excel_row + 1)  # Excel numbering (1-based)
+
+                    # Label
+                    worksheet.merge_range(
+                        excel_row, merge_start,
+                        excel_row, merge_end,
+                        f"Subtotal – {facility_name}",
+                        header_format
+                    )
+
+                    # Defensive: ensure mapping exists for block start/end
+                    if block_start not in df_to_excel_row or block_end not in df_to_excel_row:
+                        # If mapping missing (should not happen), skip formulas but still advance the row
+                        excel_row += 1
+                        continue
+
+                    excel_start = df_to_excel_row[block_start]
+                    excel_end = df_to_excel_row[block_end]
+
+                    # Numeric subtotal formulas using mapped excel rows
+                    for col in numeric_cols:
+                        col_letter = col_idx_to_excel(col)
+                        formula = f"=SUM({col_letter}{excel_start+1}:{col_letter}{excel_end+1})"
+                        worksheet.write_formula(excel_row, col, formula, header_format)
+
+                    # Percentage formulas (they reference the subtotal row itself)
+                    for col_name, formula in percent_formulas.items():
+                        if col_name in df.columns:
+                            col_idx = df.columns.get_loc(col_name)
+                            applied = formula.replace("{subtotal_row}", str(excel_row + 1))
+                            worksheet.write_formula(excel_row, col_idx, applied, percentage_format)
+
+                    excel_row += 1
+                    
+            # Apply 3-color scales to percentage columns AFTER df_to_excel_row and subtotal_rows are defined
+            for col_name in percent_formulas.keys():
                 if col_name in df.columns:
                     col_idx = df.columns.get_loc(col_name)
+                    # Apply percentage format to the entire column
                     worksheet.set_column(col_idx, col_idx, None, percentage_format)
-                    worksheet.conditional_format(2, col_idx, len(df)+2, col_idx, {
+
+                    # Determine rows to format
+                    min_row = min(df_to_excel_row.values())
+                    max_row = max(df_to_excel_row.values())
+                    if subtotal_rows:
+                        max_row = max(max_row, max(subtotal_rows))  # include subtotal rows
+
+                    # Apply 3-color scale
+                    worksheet.conditional_format(min_row, col_idx, max_row, col_idx, {
                         'type': '3_color_scale',
                         'min_color': '#F8696B',
                         'mid_color': '#FFEB84',
                         'max_color': '#63BE7B'
                     })
+            
+            # If all data rows are contiguous, you can do:
+            # Only data rows for banding
+            data_rows = list(df_to_excel_row.values())
+            for row in data_rows:
+                worksheet.conditional_format(row, 0, row, len(df.columns)-1, 
+                                            {'type': 'formula', 'criteria': 'MOD(ROW(),2)=0', 'format': row_band_format})
 
-            worksheet.conditional_format(2, 0, len(df)+1, len(df.columns)-1,
-                                         {'type': 'formula','criteria':'MOD(ROW(),2)=0','format':row_band_format})
 
-            worksheet.hide_gridlines(2)
-
-            # Column widths
-            col_widths = {'A:A':20,'B:B':35,'C:C':25}
-            for col_range, width in col_widths.items():
-                worksheet.set_column(col_range, width)
-
-            # Subtotals per facility
-            facility_col = 1
-            start_row = 2
-            current_row = start_row
-            subtotal_rows = []
-
-            while current_row <= len(df)+start_row-1:
-                facility_name = df.iloc[current_row - start_row, facility_col]
-                last_row = current_row
-
-                while last_row <= len(df)+start_row-1 and df.iloc[last_row - start_row, facility_col] == facility_name:
-                    last_row += 1
-
-                subtotal_row = last_row
-                subtotal_rows.append(subtotal_row+1)
-
-                # -----------------------------------------------------------
-                # SUBTOTAL MERGE — USE CONFIGURABLE RANGE  (NEW)
-                # -----------------------------------------------------------
-                worksheet.merge_range(
-                    subtotal_row, merge_start,
-                    subtotal_row, merge_end,
-                    f"Subtotal – {facility_name}", header_format
-                )
-
-                # Numeric subtotal formulas
-                for col in numeric_cols:
-                    col_letter = col_idx_to_excel(col)
-                    worksheet.write_formula(
-                        subtotal_row, col,
-                        f"=SUM({col_letter}{current_row+1}:{col_letter}{last_row})",
-                        header_format
-                    )
-
-                # Percentage subtotal
-                for col_name, formula in percent_formulas.items():
-                    if col_name in df.columns:
-                        col_idx = df.columns.get_loc(col_name)
-                        formula_str = formula.replace("{subtotal_row}", str(subtotal_row+1))
-                        worksheet.write_formula(subtotal_row, col_idx, formula_str, percentage_format)
-
-                current_row = subtotal_row + 1
-
-            # -----------------------------------------------------------
-            # GRAND TOTAL ROW
-            # -----------------------------------------------------------
-            grand_total_row = current_row
+            # STEP 3 — GRAND TOTAL (after all subtotals)
+            grand_total_excel_row = excel_row
 
             worksheet.merge_range(
-                grand_total_row, merge_start,
-                grand_total_row, merge_end,
+                grand_total_excel_row, merge_start,
+                grand_total_excel_row, merge_end,
                 "GRAND TOTAL",
                 grand_total_format
             )
 
+            # Numeric GRAND TOTAL: sum all subtotal rows collected
             for col in numeric_cols:
                 col_letter = col_idx_to_excel(col)
-                subtotal_cells = ",".join([f"{col_letter}{r}" for r in subtotal_rows])
-                worksheet.write_formula(
-                    grand_total_row, col,
-                    f"=SUM({subtotal_cells})",
-                    grand_total_format
-                )
+                if subtotal_rows:
+                    cells = ",".join([f"{col_letter}{r}" for r in subtotal_rows])
+                    worksheet.write_formula(
+                        grand_total_excel_row, col,
+                        f"=SUM({cells})",
+                        grand_total_format
+                    )
+                else:
+                    # no subtotal rows (edge case) -> sum entire data block
+                    excel_start = start_row
+                    excel_end = excel_row - 1
+                    formula = f"=SUM({col_letter}{excel_start+1}:{col_letter}{excel_end+1})"
+                    worksheet.write_formula(grand_total_excel_row, col, formula, grand_total_format)
 
+            # Percentage GRAND TOTAL
             for col_name, formula in percent_formulas.items():
                 if col_name in df.columns:
                     col_idx = df.columns.get_loc(col_name)
-                    formula_str = formula.replace("{subtotal_row}", str(grand_total_row+1))
-                    worksheet.write_formula(grand_total_row, col_idx, formula_str, grand_total_percentage_format)
-                    
+                    applied = formula.replace("{subtotal_row}", str(grand_total_excel_row + 1))
+                    worksheet.write_formula(
+                        grand_total_excel_row, col_idx,
+                        applied,
+                        grand_total_percentage_format
+                    )
+
         # ----------------------------
         # Non-summary Sheets
         # ----------------------------
         else:
             first_col = 0
-            last_col = len(df.columns)-1
+            last_col = len(df.columns) - 1
 
-            # Notes column for comments
             notes_col_name = "PatientHospitalNo"
+            comments_col_name = "Comments"            
+
+            # Ensure the Comments column exists
+            if comments_col_name not in df.columns:
+                df[comments_col_name] = ""
+
             if notes_col_name in df.columns:
                 notes_idx = df.columns.get_loc(notes_col_name)
+                comments_idx = len(df.columns) - 1  # place Comments at the end
+
+                # Write the Comments column header
+                worksheet.write(0, comments_idx, comments_col_name)
+                
+                # Loop through each row once
                 for row_idx in range(len(df)):
-                    alerts = []
+                    alerts = set()  # collect unique alerts
 
                     # Biometrics alert
                     if "PBS_Capture_Date" in df.columns:
                         val = df.at[row_idx, "PBS_Capture_Date"]
                         if pd.isna(val) or val == "":
-                            alerts.append("Needs biometrics capture")
+                            alerts.add("Capture biometrics")
+                            # Highlight PBS_Capture_Date column
+                            date_idx = df.columns.get_loc("PBS_Capture_Date")
+                            worksheet.conditional_format(row_idx + 1, date_idx, row_idx + 1, date_idx,
+                                                        {'type': 'no_errors', 'format': alert_format})
+                            # Highlight PBS_Capturee if exists
+                            if "PBS_Capturee" in df.columns:
+                                capturee_idx = df.columns.get_loc("PBS_Capturee")
+                                worksheet.conditional_format(row_idx + 1, capturee_idx, row_idx + 1, capturee_idx,
+                                                            {'type': 'no_errors', 'format': alert_format})
+                                # Optional Excel comment for PBS_Capturee
+                                worksheet.write_comment(row_idx + 1, capturee_idx, "Capture biometrics",
+                                                        {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
 
-                    # Mask alert
+                    # Sample collection alert
                     if sheet_name in row_masks and row_idx < len(row_masks[sheet_name]) and row_masks[sheet_name][row_idx]:
-                        alerts.append("Due for sample collection")
+                        alerts.add("Collect sample")
 
-                    if alerts:
-                        text = " | ".join(alerts)
-                        worksheet.write_comment(row_idx+1, notes_idx, text, {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
-                        # Highlight only rows with comments
-                        worksheet.conditional_format(row_idx+1, notes_idx, row_idx+1, notes_idx,
-                                                     {'type': 'no_errors', 'format': alert_format})
+                    # Default comment if no alerts
+                    if not alerts:
+                        alerts.add("OK")
 
-            # Highlight PBS_Capturee / PBS_Capture_Date
-            if "PBS_Capture_Date" in df.columns and "PBS_Capturee" in df.columns:
-                date_idx = df.columns.get_loc("PBS_Capture_Date")
-                capturee_idx = df.columns.get_loc("PBS_Capturee")
-                for row_idx in range(len(df)):
-                    date_val = df.at[row_idx, "PBS_Capture_Date"]
-                    if pd.isna(date_val) or date_val == "":
-                        worksheet.conditional_format(row_idx+1, date_idx, row_idx+1, date_idx, {'type':'no_errors','format':alert_format})
-                        worksheet.conditional_format(row_idx+1, capturee_idx, row_idx+1, capturee_idx, {'type':'no_errors','format':alert_format})
-                        # Add comment for capturee
-                        name = df.at[row_idx, "Surname"] if "Surname" in df.columns else ""
-                        worksheet.write_comment(row_idx+1, capturee_idx,
-                                                f"{name} needs to be captured for biometrics",
+                    # Combine alerts into a short string
+                    comment_text = " | ".join(sorted(alerts))
+
+                    # Optional Excel comment for Notes column (only if not OK)
+                    if "OK" not in alerts and notes_idx is not None:
+                        worksheet.write_comment(row_idx + 1, notes_idx, comment_text,
                                                 {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
+                        # Highlight Notes column
+                        worksheet.conditional_format(row_idx + 1, notes_idx, row_idx + 1, notes_idx,
+                                                    {'type': 'no_errors', 'format': alert_format})
 
-            # Mask highlighting
-            if sheet_name in row_masks:
-                mask = row_masks[sheet_name]
-                for row_idx, flag in enumerate(mask):
-                    if flag:
-                        worksheet.conditional_format(row_idx+1, first_col, row_idx+1, last_col,
-                                                    {'type': 'formula', 'criteria': '=TRUE', 'format': mask_format})
+                    # Write the comment text without format
+                    worksheet.write(row_idx + 1, comments_idx, comment_text)
+                    df.at[row_idx, comments_col_name] = comment_text
+
+                    # Apply conditional formatting based on cell value
+                    worksheet.conditional_format(row_idx + 1, comments_idx, row_idx + 1, comments_idx, {
+                        'type': 'formula',
+                        'criteria': f'={col_idx_to_excel(comments_idx)}{row_idx + 2}="OK"',
+                        'format': ok_format
+                    })
+                    worksheet.conditional_format(row_idx + 1, comments_idx, row_idx + 1, comments_idx, {
+                        'type': 'formula',
+                        'criteria': f'={col_idx_to_excel(comments_idx)}{row_idx + 2}<>"OK"',
+                        'format': alert_format
+                    })
 
             # Row banding
             worksheet.conditional_format(1, 0, len(df), len(df.columns)-1,
