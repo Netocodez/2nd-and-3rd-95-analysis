@@ -467,7 +467,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
             last_col = len(df.columns) - 1
 
             notes_col_name = "PatientHospitalNo"
-            comments_col_name = "Comments"            
+            comments_col_name = "Required Services"            
 
             # Ensure the Comments column exists
             if comments_col_name not in df.columns:
@@ -488,7 +488,7 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                     if "PBS_Capture_Date" in df.columns:
                         val = df.at[row_idx, "PBS_Capture_Date"]
                         if pd.isna(val) or val == "":
-                            alerts.add("Capture biometrics")
+                            alerts.add("biometrics")
                             # Highlight PBS_Capture_Date column
                             date_idx = df.columns.get_loc("PBS_Capture_Date")
                             worksheet.conditional_format(row_idx + 1, date_idx, row_idx + 1, date_idx,
@@ -499,12 +499,12 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                                 worksheet.conditional_format(row_idx + 1, capturee_idx, row_idx + 1, capturee_idx,
                                                             {'type': 'no_errors', 'format': alert_format})
                                 # Optional Excel comment for PBS_Capturee
-                                worksheet.write_comment(row_idx + 1, capturee_idx, "Capture biometrics",
+                                worksheet.write_comment(row_idx + 1, capturee_idx, "biometrics",
                                                         {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
 
                     # Sample collection alert
                     if sheet_name in row_masks and row_idx < len(row_masks[sheet_name]) and row_masks[sheet_name][row_idx]:
-                        alerts.add("Collect sample")
+                        alerts.add("VL SC")
 
                     # Default comment if no alerts
                     if not alerts:
@@ -536,15 +536,49 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                         'criteria': f'={col_idx_to_excel(comments_idx)}{row_idx + 2}<>"OK"',
                         'format': alert_format
                     })
+                    
+
+                # ===== AUTOFIT Required Services column =====
+                max_length = max(
+                    df[comments_col_name].astype(str).map(len).max(),
+                    len(comments_col_name)
+                )
+                worksheet.set_column(comments_idx, comments_idx, max_length + 3)
+
 
             # Row banding
             worksheet.conditional_format(1, 0, len(df), len(df.columns)-1,
                                          {'type': 'formula', 'criteria': 'MOD(ROW(),2)=0', 'format': row_band_format})
 
-            # Column widths
-            col_ranges = {'O:AF':10, 'J:M':12, 'N:N':40, 'E:F':15}
-            for col_range, width in col_ranges.items():
+            # fixed Column widths
+            fixed_col_ranges = {'O:AF':10}
+            for col_range, width in fixed_col_ranges.items():
                 worksheet.set_column(col_range, width)
+
+            # Helper: Convert Excel column letter to index (A→0, B→1, AA→26)
+            def col_letter_to_index(col_letter):
+                col_letter = col_letter.upper()
+                result = 0
+                for char in col_letter:
+                    result = result * 26 + (ord(char) - ord('A') + 1)
+                return result - 1
+
+            # === AUTOFIT SPECIFIC COLUMN RANGES ===
+            col_ranges = ['D:F','J:N', 'AL:AM']
+
+            for col_range in col_ranges:
+                start_col, end_col = col_range.split(":")
+                start_idx = col_letter_to_index(start_col)
+                end_idx = col_letter_to_index(end_col)
+
+                for col_idx in range(start_idx, end_idx + 1):
+                    col_name = df.columns[col_idx]
+                    max_length = max(
+                        df[col_name].astype(str).map(len).max(),
+                        len(col_name)
+                    )
+                    worksheet.set_column(col_idx, col_idx, max_length + 3)
+
             worksheet.set_column('G:G', None, None, {'hidden': True})
 
     # ----------------------------
