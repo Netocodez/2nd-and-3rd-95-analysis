@@ -599,3 +599,50 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
         f.write(output.getbuffer())
 
     return filename
+
+def parse_any_date(series):
+    """
+    Fully vectorized date parser.
+    - Handles mixed date formats
+    - Fixes 2-digit years (interpreted in past century if > current year)
+    - Cleans junk characters
+    """
+    s = (
+        series.astype(str)
+        .str.strip()
+        .str.replace(r'[^A-Za-z0-9:/\.\- ]', '', regex=True)   # remove junk
+        .str.replace(r'\s+', ' ', regex=True)                  # normalize spaces
+        .replace(['', 'nan', 'NaN', None], pd.NA)
+    )
+
+    # 1) Pandas auto-parse (fast, covers most formats)
+    parsed = pd.to_datetime(
+        s,
+        errors="coerce",
+        dayfirst=True,
+        infer_datetime_format=True
+    )
+
+    # 2) 8-digit numeric formats (YYYYMMDD)
+    mask = parsed.isna() & s.str.fullmatch(r'\d{8}', na=False)
+    parsed[mask] = pd.to_datetime(
+        s[mask].str.replace(r'(\d{4})(\d{2})(\d{2})', r'\1-\2-\3', regex=True),
+        errors='coerce'
+    )
+
+    # 3) 6-digit numeric formats (DDMMYY)
+    mask = parsed.isna() & s.str.fullmatch(r'\d{6}', na=False)
+    tmp = pd.to_datetime(
+        s[mask].str.replace(r'(\d{2})(\d{2})(\d{2})', r'\1-\2-\3', regex=True),
+        format="%d-%m-%y",
+        errors='coerce',
+        dayfirst=True
+    )
+    parsed[mask] = tmp
+
+    # 4) Fix 2-digit years that are in the future
+    current_year = datetime.now().year
+    mask = parsed.dt.year > current_year
+    parsed.loc[mask] = parsed.loc[mask] - pd.DateOffset(years=100)
+
+    return parsed

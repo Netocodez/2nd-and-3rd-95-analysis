@@ -3,7 +3,7 @@ import os
 import traceback
 
 from ..utils.file_loader import load_file, is_allowed_file, DATE_COLUMNS, NUMERIC_COLUMNS
-from ..utils.emr_processor import appendLamisData, ensureLGAState, emr_df
+from ..utils.emr_processor import appendLamisData, ensureLGAState, emr_df, parse_any_date
 from ..utils.third95 import third95, third95CMG
 from ..utils.second95 import second95, Second95R, Second95RCMG, second95CMG
 
@@ -28,7 +28,9 @@ def fetch_data():
         # Always apply date/numeric formatting
         for col in DATE_COLUMNS:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                #df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                df[col] = parse_any_date(df[col])
+                
         for col in NUMERIC_COLUMNS:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -103,7 +105,8 @@ def fetch_second95():
         # Format date/numeric columns
         for col in DATE_COLUMNS:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                #df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                df[col] = parse_any_date(df[col])
         for col in NUMERIC_COLUMNS:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
