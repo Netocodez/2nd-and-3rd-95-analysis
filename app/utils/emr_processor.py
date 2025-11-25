@@ -572,6 +572,9 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                 end_idx = col_letter_to_index(end_col)
 
                 for col_idx in range(start_idx, end_idx + 1):
+                    if col_idx >= len(df.columns):
+                        continue  # skip non-existing columns
+
                     col_name = df.columns[col_idx]
                     max_length = max(
                         df[col_name].astype(str).map(len).max(),
