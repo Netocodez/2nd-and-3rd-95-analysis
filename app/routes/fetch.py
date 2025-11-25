@@ -28,8 +28,8 @@ def fetch_data():
         # Always apply date/numeric formatting
         for col in DATE_COLUMNS:
             if col in df.columns:
-                #df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
-                df[col] = parse_any_date(df[col])
+                df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                #df[col] = parse_any_date(df[col])
                 
         for col in NUMERIC_COLUMNS:
             if col in df.columns:
@@ -105,8 +105,8 @@ def fetch_second95():
         # Format date/numeric columns
         for col in DATE_COLUMNS:
             if col in df.columns:
-                #df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
-                df[col] = parse_any_date(df[col])
+                df[col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                #df[col] = parse_any_date(df[col])
         for col in NUMERIC_COLUMNS:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
