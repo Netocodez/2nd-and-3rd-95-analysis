@@ -169,7 +169,7 @@ def sc_gap_mask(
     today = pd.to_datetime(end_date)
     end_of_quarter = today + pd.tseries.offsets.QuarterEnd(0)
     one_year_ago_quarter_end = (today - pd.DateOffset(years=1)) + pd.tseries.offsets.QuarterEnd(0)
-    six_months_ago = today - pd.DateOffset(months=6)
+    six_months_ago = today - pd.DateOffset(months=6) + pd.tseries.offsets.QuarterEnd(0)
 
     art_start = pd.to_datetime(df[art_start_col], errors="coerce", dayfirst=True)
     sample_date = pd.to_datetime(df[last_sample_col], errors="coerce", dayfirst=True)
