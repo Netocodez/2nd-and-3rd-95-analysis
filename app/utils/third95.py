@@ -49,29 +49,35 @@ def third95(df, end_date):
         return (date2.year - date1.year) * 12 + date2.month - date1.month - (1 if date2.day < date1.day else 0)
     
     #function to calculate current age and mirror excel datedif function
-    def calculate_age_vectorized(df, dob_col='DOB', ref_date=None):
-        # pick the reference date
+    #function to calculate current age and mirror excel datedif function
+    def calculate_age_vectorized(dob_series, ref_date=None):
+        """
+        Vectorized age calculation equivalent to Excel:
+        =DATEDIF(DOB, ref_date, "Y")
+        """
         if ref_date is None:
-            today = pd.Timestamp.today().normalize()  # current day
+            ref_date = pd.Timestamp.today().normalize()
         else:
-            today = pd.to_datetime(ref_date) # use provided reference date
+            ref_date = pd.to_datetime(ref_date)
 
-        # fully vectorized age calculation
-        dob = df[dob_col]
-        dob = dob.astype(str).str.strip()
-        dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
-        age = (today.year - dob.dt.year 
-            - ((dob.dt.month > today.month) | 
-                ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
+        dob = pd.to_datetime(dob_series, errors='coerce')
+
+        age = (
+            ref_date.year - dob.dt.year
+            - (
+                (dob.dt.month > ref_date.month) |
+                ((dob.dt.month == ref_date.month) & (dob.dt.day > ref_date.day))
+            ).astype(int)
+        )
 
         return age
     
     #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
-    df['DOB'] = df['DOB'].astype(str).str.strip()
-    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
-    
-    df['Age'] = calculate_age_vectorized(df, 'DOB', ref_date=end_date)
-    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    # Clean DOB once
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+
+    df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+    df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
 
     # Apply the function to the DataFrame
     df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
@@ -278,29 +284,34 @@ def third95CMG(df, end_date):
         next_30_days = today + pd.Timedelta(days=29)
         
         #function to calculate current age and mirror excel datedif function
-        def calculate_age_vectorized(df, dob_col='DOB', ref_date=None):
-            # pick the reference date
+        def calculate_age_vectorized(dob_series, ref_date=None):
+            """
+            Vectorized age calculation equivalent to Excel:
+            =DATEDIF(DOB, ref_date, "Y")
+            """
             if ref_date is None:
-                today = pd.Timestamp.today().normalize()  # current day
+                ref_date = pd.Timestamp.today().normalize()
             else:
-                today = pd.to_datetime(ref_date) # use provided reference date
+                ref_date = pd.to_datetime(ref_date)
 
-            # fully vectorized age calculation
-            dob = df[dob_col]
-            dob = dob.astype(str).str.strip()
-            dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
-            age = (today.year - dob.dt.year 
-                - ((dob.dt.month > today.month) | 
-                    ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
+            dob = pd.to_datetime(dob_series, errors='coerce')
+
+            age = (
+                ref_date.year - dob.dt.year
+                - (
+                    (dob.dt.month > ref_date.month) |
+                    ((dob.dt.month == ref_date.month) & (dob.dt.day > ref_date.day))
+                ).astype(int)
+            )
 
             return age
         
         #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
-        df['DOB'] = df['DOB'].astype(str).str.strip()
-        df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
-        
-        df['Age'] = calculate_age_vectorized(df, 'DOB', ref_date=end_date)
-        df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+        # Clean DOB once
+        df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+
+        df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+        df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
 
         # Get the last day of the first quarter in the last one year
         last_year = today - pd.DateOffset(years=1)
