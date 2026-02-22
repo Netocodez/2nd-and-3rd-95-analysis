@@ -20,8 +20,8 @@ def second95(df, endDate):
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
-    df['DOB'] = df['DOB'].astype(str).str.strip()
-    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    #df['DOB'] = df['DOB'].astype(str).str.strip()
+    #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     
@@ -142,8 +142,8 @@ def second95CMG(df, endDate):
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
-    df['DOB'] = df['DOB'].astype(str).str.strip()
-    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    #df['DOB'] = df['DOB'].astype(str).str.strip()
+    #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
@@ -258,8 +258,8 @@ def Second95R(df, dfbaseline, endDate):
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
-    df['DOB'] = df['DOB'].astype(str).str.strip()
-    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    #df['DOB'] = df['DOB'].astype(str).str.strip()
+    #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
         
@@ -387,8 +387,8 @@ def Second95RCMG(df, dfbaseline, endDate):
     df = trackBiometrics(df, endDate) #adding relevant columns for biometrics tracking
     
     #df.to_excel('temp.xlsx', index=False)
-    df['DOB'] = df['DOB'].astype(str).str.strip()
-    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
+    #df['DOB'] = df['DOB'].astype(str).str.strip()
+    #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
     df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
     

@@ -141,22 +141,36 @@ def ensureLGAState(df, emr_df):
     
     return df
 
-def calculate_age_vectorized(df, dob_col='DOB', ref_date=None):
-        # pick the reference date
-        if ref_date is None:
-            today = pd.Timestamp.today().normalize()  # current day
-        else:
-            today = pd.to_datetime(ref_date) # use provided reference date
+def calculate_age_vectorized(df, dob_col="DOB", ref_date=None):
 
-        # fully vectorized age calculation
-        dob = df[dob_col]
-        dob = dob.astype(str).str.strip()
-        dob = pd.to_datetime(dob, errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
-        age = (today.year - dob.dt.year 
-            - ((dob.dt.month > today.month) | 
-                ((dob.dt.month == today.month) & (dob.dt.day > today.day))).astype(int))
+    if ref_date is None:
+        today = pd.Timestamp.today().normalize()
+    else:
+        today = pd.to_datetime(ref_date)
 
-        return age
+    # Clean and convert DOB
+    dob = (
+        df[dob_col]
+        .astype(str)
+        .str.strip()
+        .replace({"": None, "nan": None})
+    )
+
+    dob = pd.to_datetime(dob, errors="coerce", dayfirst=True)
+
+    # Calculate age safely
+    age = (
+        today.year - dob.dt.year
+        - (
+            (dob.dt.month > today.month) |
+            ((dob.dt.month == today.month) & (dob.dt.day > today.day))
+        ).astype(int)
+    )
+
+    # Keep NaN where DOB invalid
+    age = age.where(dob.notna())
+
+    return age
 
 def sc_gap_mask(
         df: pd.DataFrame,
