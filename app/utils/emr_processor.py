@@ -554,7 +554,8 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
 
                 # ===== AUTOFIT Required Services column =====
                 max_length = max(
-                    df[comments_col_name].astype(str).map(len).max(),
+                    #df[comments_col_name].astype(str).map(len).max(),
+                    df[comments_col_name].fillna("").astype(str).map(len).max(),
                     len(comments_col_name)
                 )
                 worksheet.set_column(comments_idx, comments_idx, max_length + 3)
@@ -591,7 +592,8 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
 
                     col_name = df.columns[col_idx]
                     max_length = max(
-                        df[col_name].astype(str).map(len).max(),
+                        #df[col_name].astype(str).map(len).max(),
+                        df[col_name].fillna("").astype(str).map(len).max(),
                         len(col_name)
                     )
                     worksheet.set_column(col_idx, col_idx, max_length + 3)
