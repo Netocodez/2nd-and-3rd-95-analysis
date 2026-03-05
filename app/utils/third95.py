@@ -6,7 +6,7 @@ import logging
 import traceback
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized, calculate_age_vectorized2
 from .utils_3rd95 import export_3rd95_analysis
 
 def third95(df, end_date):
@@ -74,10 +74,14 @@ def third95(df, end_date):
     
     #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
     # Clean DOB once
-    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    #df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
 
-    df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
-    df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+    #df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+    #df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+    
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
+    df['Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
 
     # Apply the function to the DataFrame
     df['durationOnART'] = df.apply(lambda row: date_diff_in_months2(row['ARTStartDate2'], row['end_date']), axis=1)
@@ -308,10 +312,13 @@ def third95CMG(df, end_date):
         
         #print(repr(df.loc[df['DOB'].str.contains('1976')]['DOB'].iloc[0]))
         # Clean DOB once
-        df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+        #df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
 
-        df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
-        df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+        #df['Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+        #df['Current_Age'] = calculate_age_vectorized(df['DOB'], ref_date=end_date)
+        df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+        df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
+        df['Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
 
         # Get the last day of the first quarter in the last one year
         last_year = today - pd.DateOffset(years=1)

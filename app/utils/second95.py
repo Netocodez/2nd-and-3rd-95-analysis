@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized, calculate_age_vectorized2
 from .utils_2nd95 import (
     compute_appointment_and_iit_dates,
     classify_iit_Appt_status,
@@ -23,7 +23,9 @@ def second95(df, endDate):
     #df['DOB'] = df['DOB'].astype(str).str.strip()
     #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
-    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    #df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
     
     #Generate line lists
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
@@ -145,7 +147,9 @@ def second95CMG(df, endDate):
     #df['DOB'] = df['DOB'].astype(str).str.strip()
     #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
-    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    #df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])
@@ -261,7 +265,9 @@ def Second95R(df, dfbaseline, endDate):
     #df['DOB'] = df['DOB'].astype(str).str.strip()
     #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
-    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    #df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
         
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
     dfpreviousyearIIT = process_Linelist(df, 'previousyearIIT', 'previousyearIIT', columns_to_select2, sort_by=['LGA', 'FacilityName'])
@@ -390,7 +396,11 @@ def Second95RCMG(df, dfbaseline, endDate):
     #df['DOB'] = df['DOB'].astype(str).str.strip()
     #df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce', infer_datetime_format=True).fillna(pd.to_datetime('1900'))
     
-    df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    #df['Current_Age'] = calculate_age_vectorized(df, 'DOB', ref_date=endDate)
+    df['DOB'] = pd.to_datetime(df['DOB'].astype(str).str.strip(), errors='coerce')
+    df['Current_Age'] = calculate_age_vectorized2(df['DOB'], ref_date=endDate)
+    
+    #df.to_excel('temp2.xlsx', index=False)
     
     #apply function to process line list
     dfCurrentYearIIT = process_Linelist(df, 'CurrentYearIIT', 'CurrentYearIIT', columns_to_select, sort_by=['LGA', 'FacilityName', 'CaseManager'])

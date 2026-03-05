@@ -172,6 +172,28 @@ def calculate_age_vectorized(df, dob_col="DOB", ref_date=None):
 
     return age
 
+def calculate_age_vectorized2(dob_series, ref_date=None):
+        """
+        Vectorized age calculation equivalent to Excel:
+        =DATEDIF(DOB, ref_date, "Y")
+        """
+        if ref_date is None:
+            ref_date = pd.Timestamp.today().normalize()
+        else:
+            ref_date = pd.to_datetime(ref_date)
+
+        dob = pd.to_datetime(dob_series, errors='coerce')
+
+        age = (
+            ref_date.year - dob.dt.year
+            - (
+                (dob.dt.month > ref_date.month) |
+                ((dob.dt.month == ref_date.month) & (dob.dt.day > ref_date.day))
+            ).astype(int)
+        )
+
+        return age
+
 def sc_gap_mask(
         df: pd.DataFrame,
         end_date: str | pd.Timestamp,
