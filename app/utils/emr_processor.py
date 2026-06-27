@@ -7,8 +7,8 @@ from datetime import datetime
 emr_df = pd.read_csv("LAMISNMRS.csv", encoding='utf-8')
 
 #Filter and process line list        
-columns_to_select = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated", "CaseManager"]
-columns_to_select2 = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]
+columns_to_select = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "Current_TB_Status", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated", "CaseManager"]
+columns_to_select2 = ["S/N", "State", "LGA", "FacilityName", "PEPID", "PatientHospitalNo", "uuid", "Sex", "Current_Age", "Surname", "Firstname", "MaritalStatus", "PhoneNo", "Address", "State_of_Residence", "LGA_of_Residence", "DateConfirmedHIV+", "ARTStartDate", "Pharmacy_LastPickupdate", "DaysOfARVRefill", "CurrentARTRegimen", "NextAppt", "CurrentPregnancyStatus", "CurrentViralLoad", "DateResultReceivedFacility", "Alphanumeric_Viral_Load_Result", "LastDateOfSampleCollection", "Outcomes", "Outcomes_Date", "IIT_Date", "ARTStatus_PreviousQuarter", "CurrentARTStatus", "First_TPT_Pickupdate", "Current_TPT_Received", "Current_TB_Status", "PBS_Capturee", "PBS_Capture_Date", "Date_Generated"]
 
 #function to process line list
 def process_Linelist(df, column_name, filter_value, columns_to_select, sort_by=None, ascending=True):
@@ -228,6 +228,20 @@ def sc_gap_mask(
         (df['ARTStatus_PreviousQuarter'] == 'Active') &
         (months_on_art >= 6) &
         (adult_mask | ped_mask)
+    )
+
+    return mask
+
+def tpt_gap_mask(df):
+    """
+    Returns True for clients who require TPT initiation.
+    """
+
+    mask = (
+        (df['Current_TB_Status'] == "No signs or symptoms of disease") &
+        (df['CurrentARTStatus'] == "Active") &
+        df['First_TPT_Pickupdate'].isna() &
+        df['Current_TPT_Received'].isna()
     )
 
     return mask
@@ -516,6 +530,12 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                 # Write the Comments column header
                 worksheet.write(0, comments_idx, comments_col_name)
                 
+                highlight_columns = {
+                    "biometrics": ["PBS_Capture_Date", "PBS_Capturee"],
+                    "VL SC": ["LastDateOfSampleCollection"],
+                    "Initiate TPT": ["First_TPT_Pickupdate", "Current_TPT_Received"],
+                }
+                
                 # Loop through each row once
                 for row_idx in range(len(df)):
                     alerts = set()  # collect unique alerts
@@ -525,22 +545,13 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
                         val = df.at[row_idx, "PBS_Capture_Date"]
                         if pd.isna(val) or val == "":
                             alerts.add("biometrics")
-                            # Highlight PBS_Capture_Date column
-                            date_idx = df.columns.get_loc("PBS_Capture_Date")
-                            worksheet.conditional_format(row_idx + 1, date_idx, row_idx + 1, date_idx,
-                                                        {'type': 'no_errors', 'format': alert_format})
-                            # Highlight PBS_Capturee if exists
-                            if "PBS_Capturee" in df.columns:
-                                capturee_idx = df.columns.get_loc("PBS_Capturee")
-                                worksheet.conditional_format(row_idx + 1, capturee_idx, row_idx + 1, capturee_idx,
-                                                            {'type': 'no_errors', 'format': alert_format})
-                                # Optional Excel comment for PBS_Capturee
-                                worksheet.write_comment(row_idx + 1, capturee_idx, "biometrics",
-                                                        {'visible': False, 'x_scale': 1.5, 'y_scale': 1.5})
 
                     # Sample collection alert
-                    if sheet_name in row_masks and row_idx < len(row_masks[sheet_name]) and row_masks[sheet_name][row_idx]:
-                        alerts.add("VL SC")
+                    # Row masks (VL SC, TPT, etc.)
+                    if sheet_name in row_masks:
+                        for alert_text, mask in row_masks[sheet_name].items():
+                            if row_idx < len(mask) and mask.iloc[row_idx]:
+                                alerts.add(alert_text)
 
                     # Default comment if no alerts
                     if not alerts:
@@ -548,6 +559,36 @@ def export_to_excel_with_formatting(dataframes, formatted_period, summaryName="2
 
                     # Combine alerts into a short string
                     comment_text = " | ".join(sorted(alerts))
+                    
+                    for alert in alerts:
+                        if alert == "OK":
+                            continue
+
+                        for col_name in highlight_columns.get(alert, []):
+                            if col_name in df.columns:
+                                col_idx = df.columns.get_loc(col_name)
+
+                                worksheet.conditional_format(
+                                    row_idx + 1,
+                                    col_idx,
+                                    row_idx + 1,
+                                    col_idx,
+                                    {
+                                        'type': 'no_errors',
+                                        'format': alert_format
+                                    }
+                                )
+
+                                worksheet.write_comment(
+                                    row_idx + 1,
+                                    col_idx,
+                                    alert,
+                                    {
+                                        'visible': False,
+                                        'x_scale': 1.5,
+                                        'y_scale': 1.5
+                                    }
+                                )
 
                     # Optional Excel comment for Notes column (only if not OK)
                     if "OK" not in alerts and notes_idx is not None:

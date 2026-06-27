@@ -6,7 +6,7 @@ import logging
 import traceback
 from io import BytesIO
 from datetime import datetime
-from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, calculate_age_vectorized, calculate_age_vectorized2
+from .emr_processor import process_Linelist, columns_to_select, columns_to_select2, export_to_excel_with_formatting, sc_gap_mask, tpt_gap_mask, calculate_age_vectorized, calculate_age_vectorized2
 from .utils_3rd95 import export_3rd95_analysis
 
 def third95(df, end_date):
@@ -187,11 +187,24 @@ def third95(df, end_date):
     
     # Build row_masks for all sheets except the summary
     row_masks_dict = {}
+
     for sheet_name, df in dataframes.items():
         if sheet_name != "3RD 95 SUMMARY":
-            # Compute mask for this dataframe
-            # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-            row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+            masks = {}
+
+            masks["VL SC"] = sc_gap_mask(
+                df,
+                endDate,
+                age_col="Current_Age"
+            )
+
+            masks["Initiate TPT"] = tpt_gap_mask(df)
+
+            # Future additions
+            # masks["Biometrics"] = biometrics_mask(df)
+            # masks["EAC"] = eac_mask(df)
+
+            row_masks_dict[sheet_name] = masks
     
     # Dynamic numeric and percentage column configuration
     column_config = {
@@ -408,11 +421,24 @@ def third95CMG(df, end_date):
         
         # Build row_masks for all sheets except the summary
         row_masks_dict = {}
+
         for sheet_name, df in dataframes.items():
             if sheet_name != "3RD 95 SUMMARY":
-                # Compute mask for this dataframe
-                # Replace sc_gap_mask(df, endDate) with whatever logic applies per sheet
-                row_masks_dict[sheet_name] = sc_gap_mask(df, endDate, age_col='Current_Age')
+                masks = {}
+
+                masks["VL SC"] = sc_gap_mask(
+                    df,
+                    endDate,
+                    age_col="Current_Age"
+                )
+
+                masks["Initiate TPT"] = tpt_gap_mask(df)
+
+                # Future additions
+                # masks["Biometrics"] = biometrics_mask(df)
+                # masks["EAC"] = eac_mask(df)
+
+                row_masks_dict[sheet_name] = masks
         
         # Example DataFrames
 

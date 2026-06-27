@@ -169,6 +169,89 @@ def trackBiometrics(df, endDate):
     return df 
 
 
+def trackTPT(df, endDate):
+    # Convert endDate to datetime
+    today = pd.to_datetime(endDate)
+    current_year = today.year
+    current_week = today.isocalendar().week
+
+    # Ensure datetime formats
+    df['NextAppt'] = pd.to_datetime(df['NextAppt'], errors='coerce')
+    df['Pharmacy_LastPickupdate2'] = pd.to_datetime(
+        df['Pharmacy_LastPickupdate'], errors='coerce', dayfirst=True
+    )
+    df['LastDateOfSampleCollection2'] = pd.to_datetime(
+        df['LastDateOfSampleCollection'], errors='coerce', dayfirst=True
+    )
+    
+    df['PBS_Capture_Date2'] = pd.to_datetime(
+        df['PBS_Capture_Date'], errors='coerce', dayfirst=True
+    )
+
+    # === Eligible for TPT ===
+    mask_TPTEligible = (
+        (df['Current_TB_Status'] == "No signs or symptoms of disease") &
+        (df['CurrentARTStatus'] == 'Active')
+    )
+    df['TPTEligible'] = np.where(mask_TPTEligible, 'TPTEligible', 'notTPTEligible')
+
+    # === On TPT ===
+    mask_OnTPT = (
+        mask_TPTEligible &
+        (
+            df['First_TPT_Pickupdate'].notna() |
+            df['Current_TPT_Received'].notna()
+        )
+    )
+    df['OnTPT'] = np.where(mask_OnTPT, 'OnTPT', 'notOnTPT')
+
+    # === TPT Gap ===
+    mask_TPTGap = (
+        mask_TPTEligible &
+        df['First_TPT_Pickupdate'].isna() &
+        df['Current_TPT_Received'].isna()
+    )
+    df['TPTGap'] = np.where(mask_TPTGap, 'TPTGap', 'notTPTGap')
+
+    # === Weekly Missed TPT ===
+    mask_weekly_Missed_TPT = (
+        mask_TPTEligible &
+        # No TPT dispensed
+        df['First_TPT_Pickupdate'].isna() &
+        df['Current_TPT_Received'].isna() &
+        (
+            # Pharmacy refill this week
+            (
+                df['Pharmacy_LastPickupdate2'].notna() &
+                (df['Pharmacy_LastPickupdate2'].dt.isocalendar().week == current_week) &
+                (df['Pharmacy_LastPickupdate2'].dt.year == current_year)
+            )
+            |
+            # Biometrics captured this week
+            (
+                df['PBS_Capture_Date2'].notna() &
+                (df['PBS_Capture_Date2'].dt.isocalendar().week == current_week) &
+                (df['PBS_Capture_Date2'].dt.year == current_year)
+            )
+            |
+            # VL sample collected this week
+            (
+                df['LastDateOfSampleCollection2'].notna() &
+                (df['LastDateOfSampleCollection2'].dt.isocalendar().week == current_week) &
+                (df['LastDateOfSampleCollection2'].dt.year == current_year)
+            )
+        )
+    )
+
+    df['WKMissedTPT'] = np.where(
+        mask_weekly_Missed_TPT,
+        'WKMissedTPT',
+        'notWKMissedTPT'
+    )
+
+    return df
+
+
 def integrate_baseline_data(df, dfbaseline):
     
     #Bring in Values from baseline ART line list
